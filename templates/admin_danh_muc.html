@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block content %}
+<h2 class="fw-bold mb-1"><i class="fa-solid fa-list me-2 text-primary"></i>Quản lý danh mục</h2><p class="text-muted small mb-4">Phân loại món ăn, đồ uống</p>
+{% if message %}<div class="alert alert-info border-0 shadow-sm" style="border-radius:12px">{{ message }}</div>{% endif %}
+<div class="row g-4">
+<div class="col-lg-4"><div class="card"><div class="card-header bg-white border-0 pt-4 px-4"><h5 class="fw-bold mb-0">{{ '✏️ Sửa danh mục' if edit_dm else '➕ Thêm danh mục' }}</h5></div><div class="card-body p-4">
+<form action="/admin/danh-muc/add" method="POST">
+{% if edit_dm %}<input type="hidden" name="id" value="{{ edit_dm._id }}">{% endif %}
+<div class="mb-4"><label class="form-label fw-semibold">Tên danh mục *</label><input type="text" name="ten_danh_muc" class="form-control" style="border-radius:10px" required value="{{ edit_dm.ten_danh_muc if edit_dm else '' }}" placeholder="VD: Cà phê, Trà sữa, Ăn vặt"></div>
+<button class="btn btn-primary w-100 py-2 fw-bold" style="border-radius:10px">{{ 'Cập nhật' if edit_dm else 'Thêm mới' }}</button>
+{% if edit_dm %}<a href="/admin/danh-muc" class="btn btn-light w-100 mt-2" style="border-radius:10px">Hủy</a>{% endif %}
+</form>
+</div></div></div>
+<div class="col-lg-8"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0 align-middle"><thead><tr><th class="ps-4">#</th><th>Tên danh mục</th><th>Số món</th><th class="text-center pe-4">Thao tác</th></tr></thead><tbody>
+{% for dm in danh_mucs %}<tr><td class="ps-4">{{ loop.index }}</td><td class="fw-bold">{{ dm.ten_danh_muc }}</td><td><span class="badge bg-info-subtle text-info-emphasis border rounded-pill px-3 py-2">{{ dm.so_luong_mon }} món</span></td><td class="text-center pe-4"><a href="/admin/danh-muc?edit={{ dm._id }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Sửa</a><a href="/admin/danh-muc/delete/{{ dm._id }}" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="return confirm('Xóa danh mục?')">Xóa</a></td></tr>{% endfor %}
+</tbody></table></div></div></div></div>
+</div>
+{% endblock %}

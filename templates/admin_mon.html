@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block content %}
+<h2 class="fw-bold mb-1"><i class="fa-solid fa-utensils me-2 text-primary"></i>Quản lý thực đơn</h2><p class="text-muted small mb-4">Thêm, sửa giá món ăn, đồ uống</p>
+{% if message %}<div class="alert alert-info border-0 shadow-sm" style="border-radius:12px">{{ message }}</div>{% endif %}
+<div class="row g-4">
+<div class="col-lg-4"><div class="card"><div class="card-header bg-white border-0 pt-4 px-4"><h5 class="fw-bold mb-0">{{ '✏️ Sửa món' if edit_mon else '➕ Thêm món mới' }}</h5></div><div class="card-body p-4">
+<form action="/admin/mon/add" method="POST">
+{% if edit_mon %}<input type="hidden" name="id" value="{{ edit_mon._id }}">{% endif %}
+<div class="mb-3"><label class="form-label fw-semibold">Tên món *</label><input type="text" name="ten_mon" class="form-control" style="border-radius:10px" required value="{{ edit_mon.ten_mon if edit_mon else '' }}" placeholder="VD: Cà phê sữa đá"></div>
+<div class="mb-3"><label class="form-label fw-semibold">Danh mục</label><select name="danh_muc_id" class="form-select" style="border-radius:10px"><option value="">-- Chọn danh mục --</option>{% for dm in danh_mucs %}<option value="{{ dm._id }}" {{ 'selected' if edit_mon and edit_mon.danh_muc_id==dm._id|string else '' }}>{{ dm.ten_danh_muc }}</option>{% endfor %}</select></div>
+<div class="mb-3"><label class="form-label fw-semibold">Giá bán (VNĐ) *</label><input type="number" name="gia" class="form-control" style="border-radius:10px" min="0" step="1000" required value="{{ edit_mon.gia if edit_mon else 0 }}"></div>
+<div class="mb-4"><label class="form-label fw-semibold">Trạng thái</label><select name="trang_thai" class="form-select" style="border-radius:10px"><option value="1" {{ 'selected' if edit_mon and edit_mon.trang_thai==1 else '' }}>Còn hàng</option><option value="0" {{ 'selected' if edit_mon and edit_mon.trang_thai==0 else '' }}>Hết hàng</option></select></div>
+<button class="btn btn-primary w-100 py-2 fw-bold" style="border-radius:10px">{{ 'Cập nhật' if edit_mon else 'Thêm món' }}</button>
+{% if edit_mon %}<a href="/admin/mon" class="btn btn-light w-100 mt-2" style="border-radius:10px">Hủy</a>{% endif %}
+</form>
+</div></div></div>
+<div class="col-lg-8"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0 align-middle"><thead><tr><th class="ps-3">#</th><th>Tên món</th><th>Danh mục</th><th>Giá</th><th>Trạng thái</th><th class="text-center pe-3">Thao tác</th></tr></thead><tbody>
+{% for mon in mons %}<tr><td class="ps-3">{{ loop.index }}</td><td class="fw-bold">{{ mon.ten_mon }}</td><td><span class="badge bg-light text-dark border rounded-pill">{{ mon.ten_danh_muc }}</span></td><td class="fw-bold text-danger">{{ "{:,.0f}".format(mon.gia) }}đ</td><td>{% if mon.trang_thai==1 %}<span class="badge bg-success-subtle text-success border rounded-pill">Còn hàng</span>{% else %}<span class="badge bg-secondary-subtle text-secondary border rounded-pill">Hết hàng</span>{% endif %}</td><td class="text-center pe-3"><a href="/admin/mon?edit={{ mon._id }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Sửa</a><a href="/admin/mon/delete/{{ mon._id }}" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="return confirm('Xóa món?')">Xóa</a></td></tr>{% endfor %}
+</tbody></table></div></div></div></div>
+</div>
+{% endblock %}

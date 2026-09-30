@@ -1,0 +1,181 @@
+{
+  "cai_dat": {
+    "ten_quan": "Quán Cafe Xuân",
+    "dia_chi": "TP. Rạch Giá, Kiên Giang",
+    "dien_thoai": "0335835783"
+  },
+  "ban_an": [
+    {
+      "_id": "ban01",
+      "ten_ban": "Bàn 01",
+      "trang_thai": "co_khach"
+    },
+    {
+      "_id": "ban02",
+      "ten_ban": "Bàn 02",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "ban03",
+      "ten_ban": "Bàn 03",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "ban04",
+      "ten_ban": "Bàn 04",
+      "trang_thai": "co_khach"
+    },
+    {
+      "_id": "ban05",
+      "ten_ban": "Bàn 05",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "ban06",
+      "ten_ban": "Bàn 06",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "c4cf1aab",
+      "ten_ban": "Bàn 7",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "e7e11b39",
+      "ten_ban": "Bàn 8",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "50a4972a",
+      "ten_ban": "Bàn 9",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "9aa76a79",
+      "ten_ban": "Bàn 10",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "531f16d7",
+      "ten_ban": "Bàn 11",
+      "trang_thai": "trong"
+    },
+    {
+      "_id": "7fcd0d8f",
+      "ten_ban": "Bàn 12",
+      "trang_thai": "trong"
+    }
+  ],
+  "danh_muc": [
+    {
+      "_id": "0eb7b811",
+      "ten_danh_muc": "Đồ Ăn"
+    },
+    {
+      "_id": "65bce92e",
+      "ten_danh_muc": "Nước Uống"
+    }
+  ],
+  "san_pham": [
+    {
+      "_id": "mon1",
+      "ten_mon": "Cà phê sữa đá",
+      "danh_muc_id": "dm1",
+      "gia": 25000,
+      "trang_thai": 1
+    },
+    {
+      "_id": "c921837d",
+      "ten_mon": "Cà phê đá",
+      "danh_muc_id": "dm1",
+      "gia": 16000.0,
+      "trang_thai": 1
+    },
+    {
+      "_id": "a994d413",
+      "ten_mon": "Bún Cá",
+      "danh_muc_id": "0eb7b811",
+      "gia": 35000.0,
+      "trang_thai": 1
+    },
+    {
+      "_id": "8bd96100",
+      "ten_mon": "Bún riêu",
+      "danh_muc_id": "0eb7b811",
+      "gia": 35000.0,
+      "trang_thai": 1
+    }
+  ],
+  "hoa_don": [
+    {
+      "_id": "95889773",
+      "ban_id": "ban01",
+      "trang_thai": "chua_thanhtoan",
+      "ngay_tao_str": "2026-09-30"
+    },
+    {
+      "_id": "a3ea6210",
+      "ban_id": "ban04",
+      "trang_thai": "chua_thanhtoan",
+      "ngay_tao_str": "2026-09-30"
+    }
+  ],
+  "chi_tiet_hoa_don": [
+    {
+      "_id": "9be36194",
+      "hoa_don_id": "95889773",
+      "san_pham_id": "mon1",
+      "so_luong": 3,
+      "don_gia": 25000
+    },
+    {
+      "_id": "b24a6112",
+      "hoa_don_id": "95889773",
+      "san_pham_id": "c921837d",
+      "so_luong": 1,
+      "don_gia": 16000.0
+    },
+    {
+      "_id": "d4102bce",
+      "hoa_don_id": "95889773",
+      "san_pham_id": "a994d413",
+      "so_luong": 1,
+      "don_gia": 35000.0
+    },
+    {
+      "_id": "b2c7592a",
+      "hoa_don_id": "95889773",
+      "san_pham_id": "8bd96100",
+      "so_luong": 2,
+      "don_gia": 35000.0
+    },
+    {
+      "_id": "a774cd6c",
+      "hoa_don_id": "a3ea6210",
+      "san_pham_id": "mon1",
+      "so_luong": 1,
+      "don_gia": 25000
+    },
+    {
+      "_id": "ba9d23df",
+      "hoa_don_id": "a3ea6210",
+      "san_pham_id": "c921837d",
+      "so_luong": 1,
+      "don_gia": 16000.0
+    },
+    {
+      "_id": "ae3da062",
+      "hoa_don_id": "a3ea6210",
+      "san_pham_id": "a994d413",
+      "so_luong": 1,
+      "don_gia": 35000.0
+    },
+    {
+      "_id": "30df2838",
+      "hoa_don_id": "a3ea6210",
+      "san_pham_id": "8bd96100",
+      "so_luong": 1,
+      "don_gia": 35000.0
+    }
+  ]
+}

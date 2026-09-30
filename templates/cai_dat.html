@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block content %}
+<h2 class="fw-bold mb-1"><i class="fa-solid fa-gear me-2 text-primary"></i>Cài đặt quán</h2><p class="text-muted small mb-4">Thông tin hiển thị trên hóa đơn và footer</p>
+{% if thong_bao=='success' %}<div class="alert alert-success border-0 shadow-sm" style="border-radius:12px"><i class="fa-solid fa-circle-check me-2"></i>Cập nhật thành công!</div>{% elif thong_bao=='error' %}<div class="alert alert-danger border-0 shadow-sm" style="border-radius:12px">Tên quán không được để trống!</div>{% endif %}
+<div class="row justify-content-center"><div class="col-lg-8"><div class="card"><div class="card-header bg-white border-0 pt-4 px-4"><h5 class="fw-bold text-primary mb-0"><i class="fa-solid fa-store me-2"></i>Thông tin cửa hàng</h5></div><div class="card-body p-4">
+<form method="POST">
+<div class="mb-3"><label class="form-label fw-semibold">Tên quán / cửa hàng *</label><input type="text" name="ten_quan" class="form-control form-control-lg" style="border-radius:12px" value="{{ cai_dat.ten_quan }}" required></div>
+<div class="mb-3"><label class="form-label fw-semibold">Địa chỉ</label><input type="text" name="dia_chi" class="form-control" style="border-radius:10px" value="{{ cai_dat.dia_chi }}" placeholder="VD: 123 Nguyễn Văn Cừ, Rạch Giá"></div>
+<div class="mb-4"><label class="form-label fw-semibold">Số điện thoại / Hotline</label><input type="text" name="dien_thoai" class="form-control" style="border-radius:10px" value="{{ cai_dat.dien_thoai }}"></div>
+<div class="text-end"><button class="btn btn-primary px-5 py-2 fw-bold" style="border-radius:10px"><i class="fa-solid fa-floppy-disk me-2"></i>Lưu thay đổi</button></div>
+</form>
+</div></div></div></div>
+{% endblock %}
