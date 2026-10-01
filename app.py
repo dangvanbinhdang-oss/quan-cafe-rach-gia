@@ -160,9 +160,11 @@ def doanh_thu():
     for hd in col_hd.find({"trang_thai": "da_thanhtoan"}).sort("ngay_tao", -1):
         ngay = hd.get("ngay_tao_str","")
         if tu <= ngay <= den:
+            # Tinh tong tien
             tong = 0
             for c in col_ct.find({"hoa_don_id": str(hd["_id"])}):
                 tong += c["so_luong"] * c["don_gia"]
+            # Chuyen ObjectId -> string de khong bi loi JSON
             hd_fix = {
                 "_id": str(hd["_id"]),
                 "ban_id": hd.get("ban_id",""),
@@ -194,93 +196,27 @@ def doanh_thu():
     tong_all=sum([h["tong_tien"] for h in ds])
     return render_template("doanh_thu.html", cai_dat=cd, dt_hom_nay=0, dt_thang_nay=0, tong_doanh_thu_loc=tong_all, danh_sach_hd=ds, chi_tiet_all=chi_all, tu_ngay=tu, den_ngay=den, page_title="Doanh thu", use_atlas=True)
 
-# --- BỔ SUNG CÁC API CHO PHẦN TÁCH / GỘP BÀN ---
-@app.route("/api/ban-trong")
-def api_ban_trong():
-    try:
-        bans = list(col_ban.find({"trang_thai": "trong"}))
-        data = [{"id": str(b["_id"]), "ten_ban": b["ten_ban"]} for b in bans]
-        return jsonify(data)
-    except Exception as e:
-        return jsonify([]), 500
-
-@app.route("/api/ban-co-khach")
-def api_ban_co_khach():
-    try:
-        bans = list(col_ban.find({"trang_thai": "co_khach"}))
-        data = [{"id": str(b["_id"]), "ten_ban": b["ten_ban"]} for b in bans]
-        return jsonify(data)
-    except Exception as e:
-        return jsonify([]), 500
-
-@app.route("/api/tach-ban", methods=["POST"])
-def api_tach_ban():
-    try:
-        d = request.get_json()
-        ban_nguon = d.get("ban_nguon")
-        ban_dich = d.get("ban_dich")
-        chi_tiet_ids = d.get("chi_tiet_ids", [])
-        
-        if not ban_nguon or not ban_dich or not chi_tiet_ids:
-            return jsonify({"success": False, "message": "Thiếu thông tin tách bàn"})
-            
-        hd_nguon = col_hd.find_one({"ban_id": str(ban_nguon), "trang_thai": "chua_thanhtoan"})
-        if not hd_nguon:
-            return jsonify({"success": False, "message": "Bàn nguồn không có hóa đơn"})
-            
-        hd_dich = col_hd.find_one({"ban_id": str(ban_dich), "trang_thai": "chua_thanhtoan"})
-        if not hd_dich:
-            hid = col_hd.insert_one({"ban_id": str(ban_dich), "trang_thai": "chua_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}).inserted_id
-            hd_dich = {"_id": hid}
-            col_ban.update_one({"_id": oid(ban_dich)}, {"$set": {"trang_thai": "co_khach"}})
-            
-        for ct_id in chi_tiet_ids:
-            col_ct.update_one({"_id": oid(ct_id)}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
-            
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route("/api/gop-ban", methods=["POST"])
-def api_gop_ban():
-    try:
-        d = request.get_json()
-        ban_nguon = d.get("ban_nguon")
-        ban_dich = d.get("ban_dich")
-        
-        hd_nguon = col_hd.find_one({"ban_id": str(ban_nguon), "trang_thai": "chua_thanhtoan"})
-        hd_dich = col_hd.find_one({"ban_id": str(ban_dich), "trang_thai": "chua_thanhtoan"})
-        
-        if hd_nguon and hd_dich:
-            col_ct.update_many({"hoa_don_id": str(hd_nguon["_id"])}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
-            col_hd.delete_one({"_id": hd_nguon["_id"]})
-            col_ban.update_one({"_id": oid(ban_nguon)}, {"$set": {"trang_thai": "trong"}})
-            return jsonify({"success": True})
-        return jsonify({"success": False, "message": "Không tìm thấy hóa đơn gộp"})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# API CŨ
+# API ĐÃ FIX - BẤM + SẼ QUA PHẢI NGAY!
 @app.route("/api/mon-by-ban")
 def api_mon_by_ban():
     try:
         ban_id=request.args.get("ban_id")
-        hd=col_hd.find_one({"ban_id": str(ban_id), "trang_thai": "chua_thanhtoan"})
-        if not hd: return jsonify([])
+        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
+        if not hd: return jsonify({"success":True,"data":[]})
         cts=list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
         data=[]
         for ct in cts:
             mon=col_mon.find_one({"_id": oid(ct["san_pham_id"])})
-            data.append({"id": str(ct["_id"]), "ten_mon": mon["ten_mon"] if mon else "?", "so_luong": ct["so_luong"], "gia": ct["don_gia"]})
-        return jsonify(data)
+            data.append({"id": str(ct["_id"]), "ten_mon": mon["ten_mon"] if mon else "?", "so_luong": ct["so_luong"], "don_gia": ct["don_gia"]})
+        return jsonify({"success":True,"data":data})
     except Exception as e:
-        return jsonify([]),500
+        return jsonify({"success":False,"error":str(e)}),500
 
 @app.route("/api/goi-mon", methods=["POST"])
 def api_goi_mon():
     try:
         d=request.get_json()
-        ban_id=str(d.get("ban_id")); mon_id=d.get("mon_id"); sl=int(d.get("so_luong",1))
+        ban_id=d.get("ban_id"); mon_id=d.get("mon_id"); sl=int(d.get("so_luong",1))
         mon=col_mon.find_one({"_id": oid(mon_id)})
         if not mon: return jsonify({"success":False}),404
         hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
@@ -298,7 +234,7 @@ def api_goi_mon():
 @app.route("/api/thanh-toan", methods=["POST"])
 def api_tt():
     try:
-        ban_id=str(request.get_json().get("ban_id"))
+        ban_id=request.get_json().get("ban_id")
         hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
         if hd:
             col_hd.update_one({"_id": hd["_id"]}, {"$set": {"trang_thai": "da_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}})
@@ -319,7 +255,7 @@ def api_xoa():
 if __name__=="__main__":
     port=int(os.environ.get("PORT", 5000))
     print("="*60)
-    print("QUAN CAFE RACH GIA - MONGODB ATLAS - HOAN CHINH")
+    print("QUAN CAFE RACH GIA - MONGODB ATLAS - BAN DEP DA FIX")
     print(f"http://127.0.0.1:{port}")
     print("="*60)
     app.run(host="0.0.0.0", port=port, debug=True)
