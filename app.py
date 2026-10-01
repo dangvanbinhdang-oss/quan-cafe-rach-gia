@@ -160,11 +160,9 @@ def doanh_thu():
     for hd in col_hd.find({"trang_thai": "da_thanhtoan"}).sort("ngay_tao", -1):
         ngay = hd.get("ngay_tao_str","")
         if tu <= ngay <= den:
-            # Tinh tong tien
             tong = 0
             for c in col_ct.find({"hoa_don_id": str(hd["_id"])}):
                 tong += c["so_luong"] * c["don_gia"]
-            # Chuyen ObjectId -> string de khong bi loi JSON
             hd_fix = {
                 "_id": str(hd["_id"]),
                 "ban_id": hd.get("ban_id",""),
@@ -196,7 +194,6 @@ def doanh_thu():
     tong_all=sum([h["tong_tien"] for h in ds])
     return render_template("doanh_thu.html", cai_dat=cd, dt_hom_nay=0, dt_thang_nay=0, tong_doanh_thu_loc=tong_all, danh_sach_hd=ds, chi_tiet_all=chi_all, tu_ngay=tu, den_ngay=den, page_title="Doanh thu", use_atlas=True)
 
-# API ĐÃ FIX - BẤM + SẼ QUA PHẢI NGAY!
 @app.route("/api/mon-by-ban")
 def api_mon_by_ban():
     try:
@@ -252,10 +249,117 @@ def api_xoa():
     except Exception as e:
         return jsonify({"success":False,"error":str(e)}),500
 
+# --- TÍNH NĂNG MỚI: GỘP BÀN VÀ TÁCH / CHUYỂN MÓN ---
+
+@app.route("/api/gop-ban", methods=["POST"])
+def api_gop_ban():
+    try:
+        d = request.get_json()
+        src_id = d.get("ban_nguon")
+        dest_id = d.get("ban_dich")
+        if not src_id or not dest_id or src_id == dest_id:
+            return jsonify({"success": False, "error": "Bàn nguồn hoặc bàn đích không hợp lệ."}), 400
+
+        hd_src = col_hd.find_one({"ban_id": src_id, "trang_thai": "chua_thanhtoan"})
+        if not hd_src:
+            return jsonify({"success": False, "error": "Bàn nguồn không có hóa đơn mở."}), 400
+
+        hd_dest = col_hd.find_one({"ban_id": dest_id, "trang_thai": "chua_thanhtoan"})
+        if not hd_dest:
+            # Nếu bàn đích chưa có hóa đơn, chỉ cần đổi ban_id của hóa đơn nguồn sang bàn đích
+            col_hd.update_one({"_id": hd_src["_id"]}, {"$set": {"ban_id": dest_id}})
+            col_ban.update_one({"_id": oid(src_id)}, {"$set": {"trang_thai": "trong"}})
+            col_ban.update_one({"_id": oid(dest_id)}, {"$set": {"trang_thai": "co_khach"}})
+        else:
+            # Nếu bàn đích đã có hóa đơn, gom các chi tiết món sang hóa đơn đích
+            cts_src = list(col_ct.find({"hoa_don_id": str(hd_src["_id"])}))
+            for ct in cts_src:
+                ex = col_ct.find_one({"hoa_don_id": str(hd_dest["_id"]), "san_pham_id": ct["san_pham_id"]})
+                if ex:
+                    col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": ct["so_luong"]}})
+                    col_ct.delete_one({"_id": ct["_id"]})
+                else:
+                    col_ct.update_one({"_id": ct["_id"]}, {"$set": {"hoa_don_id": str(hd_dest["_id"])}})
+            # Đóng hóa đơn nguồn
+            col_hd.update_one({"_id": hd_src["_id"]}, {"$set": {"trang_thai": "da_huy"}})
+            col_ban.update_one({"_id": oid(src_id)}, {"$set": {"trang_thai": "trong"}})
+            col_ban.update_one({"_id": oid(dest_id)}, {"$set": {"trang_thai": "co_khach"}})
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/tach-mon", methods=["POST"])
+def api_tach_mon():
+    try:
+        d = request.get_json()
+        src_id = d.get("ban_nguon")
+        dest_id = d.get("ban_dich")
+        items = d.get("items", []) # Danh sách gồm: [{chi_tiet_id: "...", so_luong_tach: int}]
+        
+        if not src_id or not dest_id or src_id == dest_id:
+            return jsonify({"success": False, "error": "Vui lòng chọn bàn nguồn và bàn đích khác nhau."}), 400
+        
+        hd_src = col_hd.find_one({"ban_id": src_id, "trang_thai": "chua_thanhtoan"})
+        if not hd_src:
+            return jsonify({"success": False, "error": "Bàn nguồn không có hóa đơn."}), 400
+
+        # Lấy hoặc tạo hóa đơn cho bàn đích
+        hd_dest = col_hd.find_one({"ban_id": dest_id, "trang_thai": "chua_thanhtoan"})
+        if not hd_dest:
+            dest_hid = col_hd.insert_one({
+                "ban_id": dest_id, 
+                "trang_thai": "chua_thanhtoan", 
+                "ngay_tao": datetime.now(), 
+                "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")
+            }).inserted_id
+            hd_dest = {"_id": dest_hid}
+            col_ban.update_one({"_id": oid(dest_id)}, {"$set": {"trang_thai": "co_khach"}})
+
+        for it in items:
+            ct_id = it.get("chi_tiet_id")
+            sl_tach = int(it.get("so_luong_tach", 0))
+            if sl_tach <= 0: continue
+
+            ct_src = col_ct.find_one({"_id": oid(ct_id)})
+            if not ct_src: continue
+
+            if sl_tach >= ct_src["so_luong"]:
+                # Chuyển nguyên dòng chi tiết sang bàn đích
+                ex = col_ct.find_one({"hoa_don_id": str(hd_dest["_id"]), "san_pham_id": ct_src["san_pham_id"]})
+                if ex:
+                    col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": ct_src["so_luong"]}})
+                    col_ct.delete_one({"_id": ct_src["_id"]})
+                else:
+                    col_ct.update_one({"_id": ct_src["_id"]}, {"$set": {"hoa_don_id": str(hd_dest["_id"])}})
+            else:
+                # Giảm số lượng ở bàn nguồn và thêm vào bàn đích
+                col_ct.update_one({"_id": ct_src["_id"]}, {"$inc": {"so_luong": -sl_tach}})
+                ex = col_ct.find_one({"hoa_don_id": str(hd_dest["_id"]), "san_pham_id": ct_src["san_pham_id"]})
+                if ex:
+                    col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": sl_tach}})
+                else:
+                    col_ct.insert_one({
+                        "hoa_don_id": str(hd_dest["_id"]),
+                        "san_pham_id": ct_src["san_pham_id"],
+                        "so_luong": sl_tach,
+                        "don_gia": ct_src["don_gia"]
+                    })
+
+        # Kiểm tra nếu bàn nguồn hết món thì chuyển trạng thái về trống và đóng hóa đơn
+        con_lai = list(col_ct.find({"hoa_don_id": str(hd_src["_id"])}))
+        if not con_lai:
+            col_hd.update_one({"_id": hd_src["_id"]}, {"$set": {"trang_thai": "da_huy"}})
+            col_ban.update_one({"_id": oid(src_id)}, {"$set": {"trang_thai": "trong"}})
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__=="__main__":
     port=int(os.environ.get("PORT", 5000))
     print("="*60)
-    print("QUAN CAFE RACH GIA - MONGODB ATLAS - BAN DEP DA FIX")
+    print("QUAN CAFE RACH GIA - MONGODB ATLAS - TACH GOP BAN HOAN CHINH")
     print(f"http://127.0.0.1:{port}")
     print("="*60)
     app.run(host="0.0.0.0", port=port, debug=True)
