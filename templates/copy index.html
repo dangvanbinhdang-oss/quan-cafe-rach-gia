@@ -8,75 +8,31 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background-color: #eef0f2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display:flex; flex-direction:column; min-height:100vh; }
-        /* HEADER GIỐNG HÌNH */
-        .top-header {
-            background: #2b303b;
-            padding: 0 20px;
-            height: 54px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        .top-header .brand {
-            color: #ffc107;
-            font-weight: 800;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-            display: flex; align-items: center; gap: 8px;
-        }
+        .top-header { background: #2b303b; padding: 0 20px; height: 54px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1000; }
+        .top-header .brand { color: #ffc107; font-weight: 800; font-size: 1.1rem; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
         .top-header .nav-menu { display: flex; gap: 22px; margin: 0; height: 100%; align-items: center; }
-        .top-header .nav-menu a {
-            color: #9aa0a8;
-            text-decoration: none;
-            font-size: 0.92rem;
-            font-weight: 500;
-            display: flex; align-items: center; gap: 6px;
-            height: 100%;
-            border-bottom: 2px solid transparent;
-        }
+        .top-header .nav-menu a { color: #9aa0a8; text-decoration: none; font-size: 0.92rem; font-weight: 500; display: flex; align-items: center; gap: 6px; height: 100%; border-bottom: 2px solid transparent; }
         .top-header .nav-menu a:hover { color: #fff; }
         .top-header .nav-menu a.active { color: #fff; border-bottom-color: #ffc107; }
-        
-        /* MAIN */
         .main-wrapper { flex:1; padding: 18px 20px; }
         .page-title { font-weight: 700; font-size: 1.25rem; }
         .ban-card { cursor: pointer; border-radius: 10px; border-width: 2px !important; background: #fff; transition: all .15s; }
         .ban-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
         .ban-card.co-khach { border-color: #ffc107 !important; }
         .ban-card.trong { border-color: #198754 !important; }
-        
         .order-box { background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.06); display:flex; flex-direction:column; height: calc(100vh - 140px); }
         .order-items { flex:1; overflow-y:auto; }
         .menu-box { background:#fff; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
         .menu-list { max-height: 320px; overflow-y:auto; }
         .menu-item-card { cursor:pointer; }
         .menu-item-card:hover { background:#f8f9fa; }
-
-        /* FOOTER GIỐNG HÌNH */
-        .bottom-footer {
-            background: #2b303b;
-            color: #fff;
-            padding: 12px 20px;
-            display:flex; justify-content:space-between; align-items:center;
-        }
+        .bottom-footer { background: #2b303b; color: #fff; padding: 12px 20px; display:flex; justify-content:space-between; align-items:center; }
         .bottom-footer .brand { color:#ffc107; font-weight:800; text-transform:uppercase; }
-        .support-badge {
-            background:#1abc9c;
-            color:#fff;
-            border-radius:20px;
-            padding:5px 14px;
-            font-size:.82rem;
-            font-weight:600;
-            display:flex; align-items:center; gap:6px;
-        }
+        .support-badge { background:#1abc9c; color:#fff; border-radius:20px; padding:5px 14px; font-size:.82rem; font-weight:600; display:flex; align-items:center; gap:6px; }
     </style>
 </head>
 <body>
 
-<!-- HEADER TRÊN -->
 <header class="top-header">
     <div class="brand"><i class="fas fa-mug-hot"></i> {{ cai_dat.ten_quan }}</div>
     <nav class="nav-menu">
@@ -98,9 +54,7 @@
                 <button class="btn btn-info fw-bold text-white" data-bs-toggle="modal" data-bs-target="#modalTachBan"><i class="fas fa-columns me-1"></i> Tách / Chuyển món</button>
             </div>
         </div>
-
         <div class="row">
-            <!-- SƠ ĐỒ BÀN -->
             <div class="col-lg-7">
                 <div class="row">
                     {% for b in bans %}
@@ -119,8 +73,6 @@
                     {% endfor %}
                 </div>
             </div>
-
-            <!-- HÓA ĐƠN + MENU -->
             <div class="col-lg-5">
                 <div class="order-box p-3 mb-3">
                     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
@@ -138,7 +90,6 @@
                         <button class="btn btn-success w-100 fw-bold py-2" onclick="thanhToan()" id="btn-thanh-toan" disabled><i class="fas fa-cash-register me-2"></i> Thanh toán</button>
                     </div>
                 </div>
-
                 <div class="menu-box">
                     <div class="p-2 fw-bold bg-white border-bottom"><i class="fas fa-utensils me-2 text-warning"></i>Thực đơn nhanh</div>
                     <div class="menu-list p-1">
@@ -155,7 +106,6 @@
     </div>
 </div>
 
-<!-- FOOTER DƯỚI -->
 <footer class="bottom-footer">
     <div class="brand"><i class="fas fa-mug-hot me-2"></i> QUÁN CAFE RẠCH GIÁ</div>
     <div class="d-flex align-items-center gap-2">
@@ -172,7 +122,7 @@
       <div class="modal-body">
         <div class="mb-3"><label class="form-label small fw-bold">Từ bàn (Chuyển đi):</label><select id="gop-ban-nguon" class="form-select"></select></div>
         <div class="mb-3"><label class="form-label small fw-bold">Đến bàn (Gộp vào):</label><select id="gop-ban-dich" class="form-select"></select></div>
-        <div class="alert alert-warning small py-2 mb-0">Bàn 01 và Bàn 02 đều có khách thì vẫn gộp được. Toàn bộ món sẽ dồn vào bàn đích.</div>
+        <div class="alert alert-warning small py-2 mb-0">Bàn 01 và Bàn 02 đều có khách thì vẫn gộp được. Toàn bộ món sẽ dồn vào bàn đích. Hệ thống đã tự lọc không cho chọn trùng bàn.</div>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button><button class="btn btn-primary btn-sm" onclick="thucHienGopBan()">Xác nhận gộp</button></div>
     </div>
@@ -200,8 +150,12 @@
 <script>
 let currentBanId = "";
 let currentBanName = "";
+let danhSachBanCoKhach = [];
 
-document.addEventListener("DOMContentLoaded", ()=>{ loadDanhSachBanSelect(); });
+document.addEventListener("DOMContentLoaded", ()=>{
+    loadDanhSachBanSelect();
+    document.getElementById('gop-ban-nguon')?.addEventListener('change', capNhatBanDich);
+});
 
 function chonBan(banId, banTen){
     currentBanId = banId; currentBanName = banTen;
@@ -242,26 +196,42 @@ function thanhToan(){
     fetch('/api/thanh-toan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ban_id:currentBanId})})
     .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); });
 }
+
+// ===== FIX CHÍNH Ở ĐÂY =====
 function loadDanhSachBanSelect(){
-    fetch('/api/ban-co-khach').then(r=>r.json()).then(coKhach=>{
-        let htmlCoKhach = coKhach.map(b=>`<option value="${b.id}">${b.ten_ban}</option>`).join('');
-        document.getElementById('gop-ban-nguon').innerHTML = htmlCoKhach;
-        document.getElementById('gop-ban-dich').innerHTML = htmlCoKhach;
+    fetch('/api/ban-co-khach').then(r=>r.json()).then(data=>{
+        danhSachBanCoKhach = data;
+        let htmlNguon = data.map(b=>`<option value="${b.id}">${b.ten_ban}</option>`).join('');
+        document.getElementById('gop-ban-nguon').innerHTML = htmlNguon || `<option value="">Chưa có bàn có khách</option>`;
+        capNhatBanDich();
 
         Promise.all([fetch('/api/ban-co-khach').then(r=>r.json()), fetch('/api/ban-trong').then(r=>r.json())]).then(([ck, trong])=>{
             let all = [...ck, ...trong].filter(b=>b.id !== currentBanId);
-            document.getElementById('tach-ban-dich').innerHTML = all.map(b=>`<option value="${b.id}">${b.ten_ban} ${b.trang_thai==='co_khach'?'(Có khách)':'(Trống)'}</option>`).join('');
+            document.getElementById('tach-ban-dich').innerHTML = all.map(b=>`<option value="${b.id}">${b.ten_ban} ${b.trang_thai==='co_khach'?'(Có khách)':'(Trống)'}</option>`).join('') || `<option value="">Không có bàn</option>`;
         });
     });
 }
+
+function capNhatBanDich(){
+    let nguonId = document.getElementById('gop-ban-nguon').value;
+    let banDichEl = document.getElementById('gop-ban-dich');
+    let filtered = danhSachBanCoKhach.filter(b => b.id !== nguonId);
+    if(filtered.length === 0){
+        banDichEl.innerHTML = `<option value="">Không còn bàn để gộp</option>`;
+    } else {
+        banDichEl.innerHTML = filtered.map(b=>`<option value="${b.id}">${b.ten_ban}</option>`).join('');
+    }
+}
+
 function thucHienGopBan(){
     let nguon = document.getElementById('gop-ban-nguon').value;
     let dich = document.getElementById('gop-ban-dich').value;
-    if(!nguon||!dich){ alert("Chọn đủ 2 bàn"); return; }
-    if(nguon===dich){ alert("Không thể gộp trùng bàn!"); return; }
-    fetch('/api/gop-ban',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ban_nguon:nguon,ban_dich:dich})})
+    if(!nguon||!dich){ alert("Chọn đủ 2 bàn!"); return; }
+    if(nguon===dich){ alert("Không thể gộp Bàn 03 vào chính Bàn 03! Vui lòng chọn 2 bàn khác nhau."); return; }
+    fetch('/api/gop-ban',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ban_nguon: nguon, ban_dich: dich})})
     .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.message||d.error); });
 }
+
 // TÁCH BÀN
 document.getElementById('modalTachBan').addEventListener('show.bs.modal', function(){
     if(!currentBanId){ alert("Chọn bàn có khách trước!"); return; }
