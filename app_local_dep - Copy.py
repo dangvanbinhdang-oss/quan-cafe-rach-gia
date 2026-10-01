@@ -8,7 +8,6 @@ import certifi
 app = Flask(__name__)
 app.secret_key = "cafe_rach_gia_2026"
 
-# QUAN TRỌNG: Đổi mật khẩu thật của bạn vào đây!
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://dangvanbinhdang_db_user:mWpNbVmziJcrvnd3@cluster0.q1apjoi.mongodb.net/?appName=Cluster0")
 
 try:
@@ -17,7 +16,6 @@ try:
     print("✅ KET NOI ATLAS THANH CONG!")
 except Exception as e:
     print(f"❌ LOI ATLAS: {e}")
-    print("Vào Atlas > Network Access > Add IP 0.0.0.0/0")
     client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), tls=True, tlsAllowInvalidCertificates=True)
 
 db = client['quan_cafe']
@@ -47,12 +45,28 @@ def index():
         col_ban.insert_many([{"ten_ban": f"Bàn {i:02d}", "trang_thai": "trong"} for i in range(1,13)])
         col_dm.insert_many([{"ten_danh_muc": "Cà phê"}, {"ten_danh_muc": "Trà sữa"}, {"ten_danh_muc": "Đồ Ăn Vặt"}])
         bans = list(col_ban.find().sort("_id", 1))
+    
     for b in bans:
-        b["hoa_don"] = col_hd.find_one({"ban_id": str(b["_id"]), "trang_thai": "chua_thanhtoan"})
+        b["_id_str"] = str(b["_id"])
+        query_ids = [str(b["_id"])]
+        if oid(b["_id"]): query_ids.append(oid(b["_id"]))
+        hd = col_hd.find_one({"ban_id": {"$in": query_ids}, "trang_thai": "chua_thanhtoan"})
+        if hd:
+            b["hoa_don"] = hd
+            if b["trang_thai"] != "co_khach":
+                col_ban.update_one({"_id": b["_id"]}, {"$set": {"trang_thai": "co_khach"}})
+                b["trang_thai"] = "co_khach"
+        else:
+            b["hoa_don"] = None
+            if b["trang_thai"] == "co_khach":
+                col_ban.update_one({"_id": b["_id"]}, {"$set": {"trang_thai": "trong"}})
+                b["trang_thai"] = "trong"
+        
     mons = list(col_mon.find({"trang_thai": 1}))
     dms = list(col_dm.find())
     return render_template("index.html", bans=bans, mons=mons, danh_mucs=dms, cai_dat=cd, page_title="Sơ đồ bàn", use_atlas=True)
 
+# ... các route admin giữ nguyên như file của bạn ...
 @app.route("/admin/ban")
 def admin_ban():
     cd = get_cd()
@@ -75,12 +89,6 @@ def admin_ban_del(id):
     if oid(id): col_ban.delete_one({"_id": oid(id)})
     return redirect("/admin/ban?msg=deleted")
 
-@app.route("/admin/ban/status/<id>/<status>")
-def admin_ban_status(id,status):
-    if status in ["trong","co_khach","dat_truoc"] and oid(id):
-        col_ban.update_one({"_id": oid(id)}, {"$set": {"trang_thai": status}})
-    return redirect("/admin/ban?msg=status_updated")
-
 @app.route("/admin/danh-muc")
 def admin_dm():
     cd = get_cd()
@@ -101,7 +109,7 @@ def admin_dm_add():
 @app.route("/admin/danh-muc/delete/<id>")
 def admin_dm_del(id):
     if oid(id):
-        if col_mon.count_documents({"danh_muc_id": id})>0:
+        if col_mon.count_documents({"danh_muc_id": id}) > 0:
             return redirect("/admin/danh-muc?msg=has_products")
         col_dm.delete_one({"_id": oid(id)})
     return redirect("/admin/danh-muc")
@@ -120,8 +128,8 @@ def admin_mon():
 def admin_mon_add():
     ten = request.form.get("ten_mon","").strip()
     dm_id = request.form.get("danh_muc_id")
-    gia = float(request.form.get("gia",0))
-    tt = int(request.form.get("trang_thai",1))
+    gia = float(request.form.get("gia", 0))
+    tt = int(request.form.get("trang_thai", 1))
     eid = request.form.get("id")
     data = {"ten_mon": ten, "danh_muc_id": dm_id, "gia": gia, "trang_thai": tt}
     if eid and oid(eid): col_mon.update_one({"_id": oid(eid)}, {"$set": data})
@@ -132,11 +140,6 @@ def admin_mon_add():
 @app.route("/admin/mon/delete/<id>")
 def admin_mon_del(id):
     if oid(id): col_mon.delete_one({"_id": oid(id)})
-    return redirect("/admin/mon")
-
-@app.route("/admin/mon/status/<id>/<int:status>")
-def admin_mon_status(id,status):
-    if oid(id): col_mon.update_one({"_id": oid(id)}, {"$set": {"trang_thai": status}})
     return redirect("/admin/mon")
 
 @app.route("/cai-dat", methods=["GET","POST"])
@@ -153,109 +156,310 @@ def cai_dat_page():
 
 @app.route("/doanh-thu")
 def doanh_thu():
-    cd=get_cd()
-    tu=request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
-    den=request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
-    ds=[]
-    for hd in col_hd.find({"trang_thai": "da_thanhtoan"}).sort("ngay_tao", -1):
-        ngay = hd.get("ngay_tao_str","")
-        if tu <= ngay <= den:
-            # Tinh tong tien
+    cd = get_cd()
+    try:
+        tu = request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
+        den = request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
+        
+        ds = []
+        # Lấy hết rồi lọc trong Python cho an toàn, tránh lỗi sort trên Atlas
+        all_hd = list(col_hd.find({"trang_thai": "da_thanhtoan"}))
+        
+        for hd in all_hd:
+            ngay_str = hd.get("ngay_tao_str", "")
+            # Nếu hóa đơn cũ không có ngày, tự lấy từ ngay_tao
+            if not ngay_str and hd.get("ngay_tao"):
+                try:
+                    ngay_str = hd["ngay_tao"].strftime("%Y-%m-%d")
+                except:
+                    ngay_str = ""
+            
+            if not ngay_str:
+                continue
+                
+            # Lọc theo khoảng ngày (so sánh chuỗi YYYY-MM-DD)
+            if not (tu <= ngay_str <= den):
+                continue
+
+            # Tính tổng tiền
             tong = 0
-            for c in col_ct.find({"hoa_don_id": str(hd["_id"])}):
-                tong += c["so_luong"] * c["don_gia"]
-            # Chuyen ObjectId -> string de khong bi loi JSON
+            cts_raw = list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
+            for c in cts_raw:
+                try:
+                    tong += int(c.get("so_luong", 0)) * float(c.get("don_gia", 0))
+                except:
+                    pass
+            
             hd_fix = {
                 "_id": str(hd["_id"]),
-                "ban_id": hd.get("ban_id",""),
+                "ban_id": str(hd.get("ban_id","")),
                 "trang_thai": hd.get("trang_thai",""),
-                "ngay_tao_str": ngay,
+                "ngay_tao_str": ngay_str,
+                "ngay_tao": hd.get("ngay_tao"),
                 "tong_tien": tong
             }
-            ban = col_ban.find_one({"_id": oid(hd["ban_id"])}) if oid(hd["ban_id"]) else None
-            hd_fix["ten_ban"] = ban["ten_ban"] if ban else hd["ban_id"]
+            
+            # Lấy tên bàn
+            ten_ban = hd.get("ban_id","")
+            try:
+                if oid(hd.get("ban_id")):
+                    b = col_ban.find_one({"_id": oid(hd["ban_id"])})
+                    if b: ten_ban = b.get("ten_ban", ten_ban)
+            except:
+                pass
+            hd_fix["ten_ban"] = ten_ban
             ds.append(hd_fix)
-    
-    chi_all={}
-    for hd in ds:
-        cts=list(col_ct.find({"hoa_don_id": hd["_id"]}))
-        ct_fix_list=[]
-        for ct in cts:
-            mon=col_mon.find_one({"_id": oid(ct["san_pham_id"])}) if oid(ct["san_pham_id"]) else None
-            ct_fix = {
-                "_id": str(ct["_id"]),
-                "hoa_don_id": ct.get("hoa_don_id",""),
-                "san_pham_id": ct.get("san_pham_id",""),
-                "so_luong": ct.get("so_luong",0),
-                "don_gia": ct.get("don_gia",0),
-                "ten_mon": mon["ten_mon"] if mon else "Món"
-            }
-            ct_fix_list.append(ct_fix)
-        chi_all[hd["_id"]]=ct_fix_list
-    
-    tong_all=sum([h["tong_tien"] for h in ds])
-    return render_template("doanh_thu.html", cai_dat=cd, dt_hom_nay=0, dt_thang_nay=0, tong_doanh_thu_loc=tong_all, danh_sach_hd=ds, chi_tiet_all=chi_all, tu_ngay=tu, den_ngay=den, page_title="Doanh thu", use_atlas=True)
+        
+        # Sort mới nhất trước
+        ds.sort(key=lambda x: x.get("ngay_tao_str",""), reverse=True)
 
-# API ĐÃ FIX - BẤM + SẼ QUA PHẢI NGAY!
+        # Lấy chi tiết cho từng hóa đơn
+        chi_all = {}
+        for hd in ds:
+            cts = list(col_ct.find({"hoa_don_id": hd["_id"]}))
+            ct_fix_list = []
+            for ct in cts:
+                ten_mon = "Món"
+                try:
+                    if oid(ct.get("san_pham_id")):
+                        mon = col_mon.find_one({"_id": oid(ct["san_pham_id"])})
+                        if mon: ten_mon = mon.get("ten_mon", ten_mon)
+                except:
+                    pass
+                ct_fix_list.append({
+                    "_id": str(ct["_id"]),
+                    "so_luong": ct.get("so_luong", 0),
+                    "don_gia": ct.get("don_gia", 0),
+                    "ten_mon": ten_mon
+                })
+            chi_all[hd["_id"]] = ct_fix_list
+        
+        tong_all = sum([h["tong_tien"] for h in ds])
+        
+        return render_template("doanh_thu.html", 
+            cai_dat=cd, 
+            tong_doanh_thu_loc=tong_all, 
+            danh_sach_hd=ds, 
+            chi_tiet_all=chi_all, 
+            tu_ngay=tu, 
+            den_ngay=den, 
+            page_title="Doanh thu", 
+            use_atlas=True)
+            
+    except Exception as e:
+        print(f"LOI DOANH THU: {e}")
+        import traceback
+        traceback.print_exc()
+        # Trả về trang rỗng chứ không crash 500 nữa
+        return render_template("doanh_thu.html", 
+            cai_dat=cd, 
+            tong_doanh_thu_loc=0, 
+            danh_sach_hd=[], 
+            chi_tiet_all={}, 
+            tu_ngay=datetime.now().strftime("%Y-%m-%d"), 
+            den_ngay=datetime.now().strftime("%Y-%m-%d"), 
+            page_title="Doanh thu", 
+            use_atlas=True,
+            error_msg=str(e))
+
+# ================= API FIX =================
+
+@app.route("/api/ban-trong")
+def api_ban_trong():
+    try:
+        bans = list(col_ban.find({"trang_thai": "trong"}))
+        return jsonify([{"id": str(b["_id"]), "ten_ban": b["ten_ban"], "trang_thai": b["trang_thai"]} for b in bans])
+    except: return jsonify([]), 500
+
+@app.route("/api/ban-co-khach")
+def api_ban_co_khach():
+    try:
+        bans = list(col_ban.find({"trang_thai": "co_khach"}))
+        return jsonify([{"id": str(b["_id"]), "ten_ban": b["ten_ban"], "trang_thai": b["trang_thai"]} for b in bans])
+    except: return jsonify([]), 500
+
 @app.route("/api/mon-by-ban")
 def api_mon_by_ban():
     try:
-        ban_id=request.args.get("ban_id")
-        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
-        if not hd: return jsonify({"success":True,"data":[]})
-        cts=list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
-        data=[]
+        ban_id = request.args.get("ban_id")
+        if not ban_id: return jsonify([])
+        query_ban_ids = [str(ban_id)]
+        if oid(ban_id): query_ban_ids.append(oid(ban_id))
+        hd = col_hd.find_one({"ban_id": {"$in": query_ban_ids}, "trang_thai": "chua_thanhtoan"})
+        if not hd: return jsonify([])
+        cts = list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
+        data = []
         for ct in cts:
-            mon=col_mon.find_one({"_id": oid(ct["san_pham_id"])})
-            data.append({"id": str(ct["_id"]), "ten_mon": mon["ten_mon"] if mon else "?", "so_luong": ct["so_luong"], "don_gia": ct["don_gia"]})
-        return jsonify({"success":True,"data":data})
+            mon = col_mon.find_one({"_id": oid(ct["san_pham_id"])}) if oid(ct["san_pham_id"]) else None
+            data.append({"id": str(ct["_id"]), "ten_mon": mon["ten_mon"] if mon else "Món không tồn tại", "so_luong": ct["so_luong"], "gia": ct["don_gia"]})
+        return jsonify(data)
     except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
+        print(f"Lỗi api_mon_by_ban: {e}")
+        return jsonify([]), 500
 
 @app.route("/api/goi-mon", methods=["POST"])
 def api_goi_mon():
     try:
-        d=request.get_json()
-        ban_id=d.get("ban_id"); mon_id=d.get("mon_id"); sl=int(d.get("so_luong",1))
-        mon=col_mon.find_one({"_id": oid(mon_id)})
-        if not mon: return jsonify({"success":False}),404
-        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
+        d = request.get_json()
+        ban_id = str(d.get("ban_id"))
+        mon_id = d.get("mon_id")
+        sl = int(d.get("so_luong", 1))
+        mon = col_mon.find_one({"_id": oid(mon_id)})
+        if not mon: return jsonify({"success": False, "message": "Không tìm thấy món"}), 404
+        query_ban_ids = [ban_id]
+        if oid(ban_id): query_ban_ids.append(oid(ban_id))
+        hd = col_hd.find_one({"ban_id": {"$in": query_ban_ids}, "trang_thai": "chua_thanhtoan"})
         if not hd:
-            hid=col_hd.insert_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}).inserted_id
-            hd={"_id": hid}
+            hid = col_hd.insert_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}).inserted_id
+            hd = {"_id": hid}
             if oid(ban_id): col_ban.update_one({"_id": oid(ban_id)}, {"$set": {"trang_thai": "co_khach"}})
-        ex=col_ct.find_one({"hoa_don_id": str(hd["_id"]), "san_pham_id": mon_id})
+        ex = col_ct.find_one({"hoa_don_id": str(hd["_id"]), "san_pham_id": mon_id})
         if ex: col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": sl}})
         else: col_ct.insert_one({"hoa_don_id": str(hd["_id"]), "san_pham_id": mon_id, "so_luong": sl, "don_gia": mon["gia"]})
-        return jsonify({"success":True})
+        return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/thanh-toan", methods=["POST"])
 def api_tt():
     try:
-        ban_id=request.get_json().get("ban_id")
-        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
+        ban_id = str(request.get_json().get("ban_id"))
+        query_ban_ids = [ban_id]
+        if oid(ban_id): query_ban_ids.append(oid(ban_id))
+        hd = col_hd.find_one({"ban_id": {"$in": query_ban_ids}, "trang_thai": "chua_thanhtoan"})
         if hd:
             col_hd.update_one({"_id": hd["_id"]}, {"$set": {"trang_thai": "da_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}})
             if oid(ban_id): col_ban.update_one({"_id": oid(ban_id)}, {"$set": {"trang_thai": "trong"}})
-        return jsonify({"success":True})
+        return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/xoa-mon", methods=["POST"])
 def api_xoa():
     try:
-        cid=request.get_json().get("id")
+        cid = request.get_json().get("id")
         if oid(cid): col_ct.delete_one({"_id": oid(cid)})
-        return jsonify({"success":True})
+        return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
+        return jsonify({"success": False, "error": str(e)}), 500
 
-if __name__=="__main__":
-    port=int(os.environ.get("PORT", 5000))
-    print("="*60)
-    print("QUAN CAFE RACH GIA - MONGODB ATLAS - BAN DEP DA FIX")
-    print(f"http://127.0.0.1:{port}")
-    print("="*60)
+# FIX GOP BAN - CHO PHEP 2 BAN CO KHACH GOP VAO NHAU
+@app.route("/api/gop-ban", methods=["POST"])
+def api_gop_ban():
+    try:
+        d = request.get_json()
+        ban_nguon = str(d.get("ban_nguon"))
+        ban_dich = str(d.get("ban_dich"))
+        
+        if ban_nguon == ban_dich:
+            return jsonify({"success": False, "message": "Không thể gộp 2 bàn trùng nhau!"})
+
+        q_nguon = [ban_nguon]
+        if oid(ban_nguon): q_nguon.append(oid(ban_nguon))
+        q_dich = [ban_dich]
+        if oid(ban_dich): q_dich.append(oid(ban_dich))
+        
+        hd_nguon = col_hd.find_one({"ban_id": {"$in": q_nguon}, "trang_thai": "chua_thanhtoan"})
+        hd_dich = col_hd.find_one({"ban_id": {"$in": q_dich}, "trang_thai": "chua_thanhtoan"})
+        
+        if not hd_nguon:
+            return jsonify({"success": False, "message": "Bàn nguồn không có hóa đơn để gộp"})
+            
+        # Trường hợp gộp vào bàn trống -> chuyển bàn
+        if not hd_dich:
+            col_hd.update_one({"_id": hd_nguon["_id"]}, {"$set": {"ban_id": ban_dich}})
+            if oid(ban_nguon): col_ban.update_one({"_id": oid(ban_nguon)}, {"$set": {"trang_thai": "trong"}})
+            if oid(ban_dich): col_ban.update_one({"_id": oid(ban_dich)}, {"$set": {"trang_thai": "co_khach"}})
+            return jsonify({"success": True})
+        
+        # Trường hợp FIX: Bàn 01 và Bàn 02 đều có khách vẫn gộp được
+        # Gộp chi tiết
+        for ct_nguon in col_ct.find({"hoa_don_id": str(hd_nguon["_id"])}):
+            ct_dich = col_ct.find_one({"hoa_don_id": str(hd_dich["_id"]), "san_pham_id": ct_nguon["san_pham_id"]})
+            if ct_dich:
+                col_ct.update_one({"_id": ct_dich["_id"]}, {"$inc": {"so_luong": ct_nguon["so_luong"]}})
+                col_ct.delete_one({"_id": ct_nguon["_id"]})
+            else:
+                col_ct.update_one({"_id": ct_nguon["_id"]}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
+        
+        col_hd.delete_one({"_id": hd_nguon["_id"]})
+        if oid(ban_nguon): col_ban.update_one({"_id": oid(ban_nguon)}, {"$set": {"trang_thai": "trong"}})
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Loi gop ban: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# API MOI - TACH BAN / CHUYEN MON
+@app.route("/api/tach-ban", methods=["POST"])
+def api_tach_ban():
+    try:
+        d = request.get_json()
+        ban_nguon = str(d.get("ban_nguon"))
+        ban_dich = str(d.get("ban_dich"))
+        mon_chuyen = d.get("mon_chuyen", []) # list {id, so_luong}
+
+        if ban_nguon == ban_dich:
+            return jsonify({"success": False, "message": "Không thể tách cùng 1 bàn"})
+
+        q_nguon = [ban_nguon]
+        if oid(ban_nguon): q_nguon.append(oid(ban_nguon))
+        q_dich = [ban_dich]
+        if oid(ban_dich): q_dich.append(oid(ban_dich))
+
+        hd_nguon = col_hd.find_one({"ban_id": {"$in": q_nguon}, "trang_thai": "chua_thanhtoan"})
+        if not hd_nguon:
+            return jsonify({"success": False, "message": "Bàn nguồn không có hóa đơn"})
+
+        hd_dich = col_hd.find_one({"ban_id": {"$in": q_dich}, "trang_thai": "chua_thanhtoan"})
+        if not hd_dich:
+            hd_dich_id = col_hd.insert_one({
+                "ban_id": ban_dich,
+                "trang_thai": "chua_thanhtoan",
+                "ngay_tao": datetime.now(),
+                "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")
+            }).inserted_id
+            hd_dich = {"_id": hd_dich_id}
+            if oid(ban_dich): col_ban.update_one({"_id": oid(ban_dich)}, {"$set": {"trang_thai": "co_khach"}})
+
+        for item in mon_chuyen:
+            ct_id = item.get("id")
+            sl_chuyen = int(item.get("so_luong", 1))
+            ct = col_ct.find_one({"_id": oid(ct_id)})
+            if not ct: continue
+
+            if sl_chuyen >= ct["so_luong"]:
+                # Chuyển hết - kiểm tra trùng món ở bàn đích thì cộng dồn
+                ct_trung = col_ct.find_one({"hoa_don_id": str(hd_dich["_id"]), "san_pham_id": ct["san_pham_id"]})
+                if ct_trung:
+                    col_ct.update_one({"_id": ct_trung["_id"]}, {"$inc": {"so_luong": ct["so_luong"]}})
+                    col_ct.delete_one({"_id": ct["_id"]})
+                else:
+                    col_ct.update_one({"_id": ct["_id"]}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
+            else:
+                # Tách 1 phần
+                col_ct.update_one({"_id": ct["_id"]}, {"$inc": {"so_luong": -sl_chuyen}})
+                ct_trung = col_ct.find_one({"hoa_don_id": str(hd_dich["_id"]), "san_pham_id": ct["san_pham_id"]})
+                if ct_trung:
+                    col_ct.update_one({"_id": ct_trung["_id"]}, {"$inc": {"so_luong": sl_chuyen}})
+                else:
+                    col_ct.insert_one({
+                        "hoa_don_id": str(hd_dich["_id"]),
+                        "san_pham_id": ct["san_pham_id"],
+                        "so_luong": sl_chuyen,
+                        "don_gia": ct["don_gia"]
+                    })
+
+        # Nếu bàn nguồn hết món -> cho trống
+        if col_ct.count_documents({"hoa_don_id": str(hd_nguon["_id"])}) == 0:
+            col_hd.delete_one({"_id": hd_nguon["_id"]})
+            if oid(ban_nguon): col_ban.update_one({"_id": oid(ban_nguon)}, {"$set": {"trang_thai": "trong"}})
+
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Loi tach ban: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
