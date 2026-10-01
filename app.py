@@ -25,6 +25,8 @@ col_mon = db['san_pham']
 col_cd = db['cai_dat']
 col_hd = db['hoa_don']
 col_ct = db['chi_tiet_hoa_don']
+col_nv = db['nhan_vien']
+col_ca = db['phan_ca']
 
 def get_cd():
     cd = col_cd.find_one({"_id": "cau_hinh_1"})
