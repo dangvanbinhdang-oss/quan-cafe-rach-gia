@@ -155,55 +155,91 @@ def cai_dat_page():
             cd=get_cd()
     return render_template("cai_dat.html", cai_dat=cd, thong_bao=tb, page_title="Cài đặt")
 
+# ==================== DOANH THU - BẢN ĐÚNG CHO TEMPLATE CỦA BẠN ====================
 @app.route("/doanh-thu")
 def doanh_thu():
     cd = get_cd()
-    tu = request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
-    den = request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
-    ds = []
-    chi_all = {}
-    tong_all = 0
+    tu_ngay = request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
+    den_ngay = request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
+    hom_nay_str = datetime.now().strftime("%Y-%m-%d")
+    thang_prefix = datetime.now().strftime("%Y-%m")
+
+    danh_sach_hd = []
+    chi_tiet_all = {}
+    tong_doanh_thu_loc = 0
+    dt_hom_nay = 0
+    dt_thang_nay = 0
+
     try:
         all_hd = list(col_hd.find({"trang_thai": "da_thanhtoan"}))
         for hd in all_hd:
             ngay_str = hd.get("ngay_tao_str", "")
             if not ngay_str and hd.get("ngay_tao"):
                 try: ngay_str = hd["ngay_tao"].strftime("%Y-%m-%d")
-                except: ngay_str = ""
-            if not ngay_str: ngay_str = datetime.now().strftime("%Y-%m-%d")
-            if not (tu <= ngay_str <= den): continue
+                except: ngay_str = hom_nay_str
+            if not ngay_str: continue
 
+            # tính tổng
             tong = 0
-            for c in list(col_ct.find({"hoa_don_id": str(hd["_id"])})):
+            cts = list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
+            for c in cts:
                 try: tong += int(c.get("so_luong",0)) * float(c.get("don_gia",0))
                 except: pass
 
+            # cộng dồn hôm nay / tháng này
+            if ngay_str == hom_nay_str:
+                dt_hom_nay += tong
+            if ngay_str.startswith(thang_prefix):
+                dt_thang_nay += tong
+
+            # lọc theo khoảng user chọn
+            if not (tu_ngay <= ngay_str <= den_ngay):
+                continue
+
             ten_ban = str(hd.get("ban_id",""))
-            b_obj = None
-            if oid(hd.get("ban_id")): b_obj = col_ban.find_one({"_id": oid(hd["ban_id"])})
-            if b_obj: ten_ban = b_obj.get("ten_ban", ten_ban)
+            if oid(hd.get("ban_id")):
+                b = col_ban.find_one({"_id": oid(hd["ban_id"])})
+                if b: ten_ban = b.get("ten_ban", ten_ban)
 
             hd_id_str = str(hd["_id"])
-            ds.append({"_id": hd_id_str, "ten_ban": ten_ban, "ngay_tao_str": ngay_str, "tong_tien": tong})
-            
+            danh_sach_hd.append({
+                "_id": hd_id_str,
+                "ten_ban": ten_ban,
+                "ngay_tao_str": ngay_str,
+                "tong_tien": tong
+            })
+            tong_doanh_thu_loc += tong
+
             lst = []
-            for ct in list(col_ct.find({"hoa_don_id": hd_id_str})):
+            for ct in cts:
                 ten_mon = "Món"
                 if oid(ct.get("san_pham_id")):
                     m = col_mon.find_one({"_id": oid(ct["san_pham_id"])})
                     if m: ten_mon = m.get("ten_mon", ten_mon)
-                lst.append({"ten_mon": ten_mon, "so_luong": ct.get("so_luong",0), "don_gia": ct.get("don_gia",0)})
-            chi_all[hd_id_str] = lst
+                lst.append({
+                    "ten_mon": ten_mon,
+                    "so_luong": ct.get("so_luong",0),
+                    "don_gia": ct.get("don_gia",0)
+                })
+            chi_tiet_all[hd_id_str] = lst
 
-        ds.sort(key=lambda x: x["ngay_tao_str"], reverse=True)
-        tong_all = sum([h["tong_tien"] for h in ds])
+        danh_sach_hd.sort(key=lambda x: x["ngay_tao_str"], reverse=True)
+
     except Exception as e:
         print("LOI DOANH THU:", e)
         traceback.print_exc()
 
-    return render_template("doanh_thu.html", cai_dat=cd, tong_doanh_thu_loc=tong_all,
-                           danh_sach_hd=ds, chi_tiet_all=chi_all,
-                           tu_ngay=tu, den_ngay=den, page_title="Doanh thu")
+    return render_template("doanh_thu.html",
+        cai_dat=cd,
+        tu_ngay=tu_ngay,
+        den_ngay=den_ngay,
+        dt_hom_nay=dt_hom_nay,
+        dt_thang_nay=dt_thang_nay,
+        tong_doanh_thu_loc=tong_doanh_thu_loc,
+        danh_sach_hd=danh_sach_hd,
+        chi_tiet_all=chi_tiet_all,
+        page_title="Doanh thu"
+    )
 
 # API
 @app.route("/api/ban-trong")
