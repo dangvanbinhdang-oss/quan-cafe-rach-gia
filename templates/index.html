@@ -1,318 +1,474 @@
-import os
-from flask import Flask, render_template, request, redirect, jsonify
-from pymongo import MongoClient
-from bson import ObjectId
-from datetime import datetime
-import certifi
- 
-app = Flask(__name__)
-app.secret_key = "cafe_rach_gia_2026"
- 
-_default_uri = "mongodb+srv://dangvanbinhdang_db_user:mWpNbVmziJcrvnd3@cluster0.q1apjoi.mongodb.net/cafe_db?retryWrites=true&w=majority&appName=Cluster0"
-_env_uri = os.environ.get("MONGO_URI", _default_uri)
-if "mongodb.net/?" in _env_uri:
-    _env_uri = _env_uri.replace("mongodb.net/?", "mongodb.net/cafe_db?retryWrites=true&w=majority&")
-MONGO_URI = _env_uri
- 
-try:
-    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), tls=True, serverSelectionTimeoutMS=15000, retryWrites=True)
-    client.admin.command('ping')
-    print("✅ KET NOI ATLAS THANH CONG!")
-except Exception as e:
-    print(f"❌ LOI ATLAS: {e}")
-    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), tls=True, tlsAllowInvalidCertificates=True)
- 
-db = client['quan_cafe']
-col_ban = db['ban_an']
-col_dm = db['danh_muc']
-col_mon = db['san_pham']
-col_cd = db['cai_dat']
-col_hd = db['hoa_don']
-col_ct = db['chi_tiet_hoa_don']
- 
-def get_cd():
-    cd = col_cd.find_one({"_id": "cau_hinh_1"})
-    if not cd:
-        cd = {"_id": "cau_hinh_1", "ten_quan": "QUÁN CAFE RẠCH GIÁ", "dia_chi": "TP. Rạch Giá, Kiên Giang", "dien_thoai": "0909 123 456"}
-        col_cd.insert_one(cd)
-    return cd
- 
-def oid(s):
-    try: return ObjectId(s)
-    except: return None
- 
-@app.route("/")
-def index():
-    cd = get_cd()
-    bans = list(col_ban.find().sort("_id", 1))
-    if not bans:
-        col_ban.insert_many([{"ten_ban": f"Bàn {i:02d}", "trang_thai": "trong"} for i in range(1,13)])
-        col_dm.insert_many([{"ten_danh_muc": "Cà phê"}, {"ten_danh_muc": "Trà sữa"}, {"ten_danh_muc": "Đồ Ăn Vặt"}])
-        bans = list(col_ban.find().sort("_id", 1))
-    for b in bans:
-        b["hoa_don"] = col_hd.find_one({"ban_id": str(b["_id"]), "trang_thai": "chua_thanhtoan"})
-    mons = list(col_mon.find({"trang_thai": 1}))
-    dms = list(col_dm.find())
-    return render_template("index.html", bans=bans, mons=mons, danh_mucs=dms, cai_dat=cd, page_title="Sơ đồ bàn", use_atlas=True)
- 
-@app.route("/admin/ban")
-def admin_ban():
-    cd = get_cd()
-    bans = list(col_ban.find().sort("_id", 1))
-    edit = col_ban.find_one({"_id": oid(request.args.get("edit"))}) if request.args.get("edit") else None
-    return render_template("admin_ban.html", bans=bans, edit_ban=edit, message=request.args.get("msg",""), cai_dat=cd, page_title="Quản lý bàn", use_atlas=True)
- 
-@app.route("/admin/ban/add", methods=["POST"])
-def admin_ban_add():
-    ten = request.form.get("ten_ban","").strip()
-    tt = request.form.get("trang_thai","trong")
-    eid = request.form.get("id")
-    if eid and oid(eid): col_ban.update_one({"_id": oid(eid)}, {"$set": {"ten_ban": ten, "trang_thai": tt}})
-    else:
-        if ten: col_ban.insert_one({"ten_ban": ten, "trang_thai": tt})
-    return redirect("/admin/ban?msg=added")
- 
-@app.route("/admin/ban/delete/<id>")
-def admin_ban_del(id):
-    if oid(id): col_ban.delete_one({"_id": oid(id)})
-    return redirect("/admin/ban?msg=deleted")
- 
-@app.route("/admin/ban/status/<id>/<status>")
-def admin_ban_status(id,status):
-    if status in ["trong","co_khach","dat_truoc"] and oid(id):
-        col_ban.update_one({"_id": oid(id)}, {"$set": {"trang_thai": status}})
-    return redirect("/admin/ban?msg=status_updated")
- 
-@app.route("/admin/danh-muc")
-def admin_dm():
-    cd = get_cd()
-    dms = list(col_dm.find().sort("_id", 1))
-    for dm in dms: dm["so_luong_mon"] = col_mon.count_documents({"danh_muc_id": str(dm["_id"])})
-    edit = col_dm.find_one({"_id": oid(request.args.get("edit"))}) if request.args.get("edit") else None
-    return render_template("admin_danh_muc.html", danh_mucs=dms, edit_dm=edit, message=request.args.get("msg",""), cai_dat=cd, page_title="Quản lý danh mục", use_atlas=True)
- 
-@app.route("/admin/danh-muc/add", methods=["POST"])
-def admin_dm_add():
-    ten = request.form.get("ten_danh_muc","").strip()
-    eid = request.form.get("id")
-    if eid and oid(eid): col_dm.update_one({"_id": oid(eid)}, {"$set": {"ten_danh_muc": ten}})
-    else:
-        if ten: col_dm.insert_one({"ten_danh_muc": ten})
-    return redirect("/admin/danh-muc")
- 
-@app.route("/admin/danh-muc/delete/<id>")
-def admin_dm_del(id):
-    if oid(id):
-        if col_mon.count_documents({"danh_muc_id": id})>0:
-            return redirect("/admin/danh-muc?msg=has_products")
-        col_dm.delete_one({"_id": oid(id)})
-    return redirect("/admin/danh-muc")
- 
-@app.route("/admin/mon")
-def admin_mon():
-    cd = get_cd()
-    mons = list(col_mon.find().sort("_id", -1))
-    dm_map = {str(d["_id"]): d["ten_danh_muc"] for d in col_dm.find()}
-    for m in mons: m["ten_danh_muc"] = dm_map.get(m.get("danh_muc_id"), "Khác")
-    dms = list(col_dm.find())
-    edit = col_mon.find_one({"_id": oid(request.args.get("edit"))}) if request.args.get("edit") else None
-    return render_template("admin_mon.html", mons=mons, danh_mucs=dms, edit_mon=edit, message=request.args.get("msg",""), cai_dat=cd, page_title="Quản lý thực đơn", use_atlas=True)
- 
-@app.route("/admin/mon/add", methods=["POST"])
-def admin_mon_add():
-    ten = request.form.get("ten_mon","").strip()
-    dm_id = request.form.get("danh_muc_id")
-    gia = float(request.form.get("gia",0))
-    tt = int(request.form.get("trang_thai",1))
-    eid = request.form.get("id")
-    data = {"ten_mon": ten, "danh_muc_id": dm_id, "gia": gia, "trang_thai": tt}
-    if eid and oid(eid): col_mon.update_one({"_id": oid(eid)}, {"$set": data})
-    else:
-        if ten: col_mon.insert_one(data)
-    return redirect("/admin/mon")
- 
-@app.route("/admin/mon/delete/<id>")
-def admin_mon_del(id):
-    if oid(id): col_mon.delete_one({"_id": oid(id)})
-    return redirect("/admin/mon")
- 
-@app.route("/admin/mon/status/<id>/<int:status>")
-def admin_mon_status(id,status):
-    if oid(id): col_mon.update_one({"_id": oid(id)}, {"$set": {"trang_thai": status}})
-    return redirect("/admin/mon")
- 
-@app.route("/cai-dat", methods=["GET","POST"])
-def cai_dat_page():
-    cd = get_cd()
-    tb=""
-    if request.method=="POST":
-        ten=request.form.get("ten_quan","").strip()
-        if ten:
-            col_cd.update_one({"_id": "cau_hinh_1"}, {"$set": {"ten_quan": ten, "dia_chi": request.form.get("dia_chi",""), "dien_thoai": request.form.get("dien_thoai","")}}, upsert=True)
-            tb="success"
-            cd=get_cd()
-    return render_template("cai_dat.html", cai_dat=cd, thong_bao=tb, page_title="Cài đặt", use_atlas=True)
- 
-@app.route("/doanh-thu")
-def doanh_thu():
-    cd=get_cd()
-    tu=request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
-    den=request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
-    ds=[]
-    for hd in col_hd.find({"trang_thai": "da_thanhtoan"}).sort("ngay_tao", -1):
-        ngay = hd.get("ngay_tao_str","")
-        if tu <= ngay <= den:
-            tong = 0
-            for c in col_ct.find({"hoa_don_id": str(hd["_id"])}):
-                tong += c["so_luong"] * c["don_gia"]
-            hd_fix = {"_id": str(hd["_id"]), "ban_id": hd.get("ban_id",""), "trang_thai": hd.get("trang_thai",""), "ngay_tao_str": ngay, "tong_tien": tong}
-            ban = col_ban.find_one({"_id": oid(hd["ban_id"])}) if oid(hd["ban_id"]) else None
-            hd_fix["ten_ban"] = ban["ten_ban"] if ban else hd["ban_id"]
-            ds.append(hd_fix)
-    chi_all={}
-    for hd in ds:
-        cts=list(col_ct.find({"hoa_don_id": hd["_id"]}))
-        ct_fix_list=[]
-        for ct in cts:
-            mon=col_mon.find_one({"_id": oid(ct["san_pham_id"])}) if oid(ct["san_pham_id"]) else None
-            ct_fix = {"_id": str(ct["_id"]), "hoa_don_id": ct.get("hoa_don_id",""), "san_pham_id": ct.get("san_pham_id",""), "so_luong": ct.get("so_luong",0), "don_gia": ct.get("don_gia",0), "ten_mon": mon["ten_mon"] if mon else "Món"}
-            ct_fix_list.append(ct_fix)
-        chi_all[hd["_id"]]=ct_fix_list
-    tong_all=sum([h["tong_tien"] for h in ds])
-    return render_template("doanh_thu.html", cai_dat=cd, dt_hom_nay=0, dt_thang_nay=0, tong_doanh_thu_loc=tong_all, danh_sach_hd=ds, chi_tiet_all=chi_all, tu_ngay=tu, den_ngay=den, page_title="Doanh thu", use_atlas=True)
- 
-@app.route("/api/mon-by-ban")
-def api_mon_by_ban():
-    try:
-        ban_id=request.args.get("ban_id")
-        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
-        if not hd: return jsonify({"success":True,"data":[]})
-        cts=list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
-        data=[]
-        for ct in cts:
-            mon=col_mon.find_one({"_id": oid(ct["san_pham_id"])})
-            data.append({"id": str(ct["_id"]), "ten_mon": mon["ten_mon"] if mon else "?", "so_luong": ct["so_luong"], "don_gia": ct["don_gia"]})
-        return jsonify({"success":True,"data":data})
-    except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
- 
-@app.route("/api/goi-mon", methods=["POST"])
-def api_goi_mon():
-    try:
-        d=request.get_json()
-        ban_id=d.get("ban_id"); mon_id=d.get("mon_id"); sl=int(d.get("so_luong",1))
-        mon=col_mon.find_one({"_id": oid(mon_id)})
-        if not mon: return jsonify({"success":False}),404
-        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
-        if not hd:
-            hid=col_hd.insert_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}).inserted_id
-            hd={"_id": hid}
-            if oid(ban_id): col_ban.update_one({"_id": oid(ban_id)}, {"$set": {"trang_thai": "co_khach"}})
-        ex=col_ct.find_one({"hoa_don_id": str(hd["_id"]), "san_pham_id": mon_id})
-        if ex: col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": sl}})
-        else: col_ct.insert_one({"hoa_don_id": str(hd["_id"]), "san_pham_id": mon_id, "so_luong": sl, "don_gia": mon["gia"]})
-        return jsonify({"success":True})
-    except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
- 
-@app.route("/api/thanh-toan", methods=["POST"])
-def api_tt():
-    try:
-        ban_id=request.get_json().get("ban_id")
-        hd=col_hd.find_one({"ban_id": ban_id, "trang_thai": "chua_thanhtoan"})
-        if hd:
-            col_hd.update_one({"_id": hd["_id"]}, {"$set": {"trang_thai": "da_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}})
-            if oid(ban_id): col_ban.update_one({"_id": oid(ban_id)}, {"$set": {"trang_thai": "trong"}})
-        return jsonify({"success":True})
-    except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
- 
-@app.route("/api/xoa-mon", methods=["POST"])
-def api_xoa():
-    try:
-        cid=request.get_json().get("id")
-        if oid(cid): col_ct.delete_one({"_id": oid(cid)})
-        return jsonify({"success":True})
-    except Exception as e:
-        return jsonify({"success":False,"error":str(e)}),500
- 
-@app.route("/api/ban-trong")
-def api_ban_trong():
-    bans = list(col_ban.find({"trang_thai": "trong"}).sort("_id", 1))
-    return jsonify({"success": True, "data": [{"id": str(b["_id"]), "ten_ban": b["ten_ban"]} for b in bans]})
- 
-@app.route("/api/ban-co-khach")
-def api_ban_co_khach():
-    bans = list(col_ban.find({"trang_thai": "co_khach"}).sort("_id", 1))
-    return jsonify({"success": True, "data": [{"id": str(b["_id"]), "ten_ban": b["ten_ban"]} for b in bans]})
- 
-@app.route("/api/gop-ban", methods=["POST"])
-def api_gop_ban():
-    try:
-        d = request.get_json()
-        ban_dich_id = d.get("ban_dich")
-        ban_nguon_ids = d.get("ban_nguon", [])
-        if not ban_dich_id or not ban_nguon_ids:
-            return jsonify({"success": False, "error": "Thieu ban"}), 400
-        hd_dich = col_hd.find_one({"ban_id": ban_dich_id, "trang_thai": "chua_thanhtoan"})
-        if not hd_dich:
-            hid = col_hd.insert_one({"ban_id": ban_dich_id, "trang_thai": "chua_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}).inserted_id
-            hd_dich = {"_id": hid}
-            if oid(ban_dich_id): col_ban.update_one({"_id": oid(ban_dich_id)}, {"$set": {"trang_thai": "co_khach"}})
-        for src_id in ban_nguon_ids:
-            if src_id == ban_dich_id: continue
-            hd_src = col_hd.find_one({"ban_id": src_id, "trang_thai": "chua_thanhtoan"})
-            if not hd_src: continue
-            for ct in list(col_ct.find({"hoa_don_id": str(hd_src["_id"])})):
-                ex = col_ct.find_one({"hoa_don_id": str(hd_dich["_id"]), "san_pham_id": ct["san_pham_id"]})
-                if ex:
-                    col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": ct["so_luong"]}})
-                    col_ct.delete_one({"_id": ct["_id"]})
-                else:
-                    col_ct.update_one({"_id": ct["_id"]}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
-            col_hd.update_one({"_id": hd_src["_id"]}, {"$set": {"trang_thai": "da_thanhtoan"}})
-            if oid(src_id): col_ban.update_one({"_id": oid(src_id)}, {"$set": {"trang_thai": "trong"}})
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
- 
-@app.route("/api/tach-ban", methods=["POST"])
-def api_tach_ban():
-    try:
-        d = request.get_json()
-        ban_nguon_id = d.get("ban_nguon")
-        ban_dich_id = d.get("ban_dich")
-        chi_tiet_ids = d.get("chi_tiet_ids", [])
-        if not ban_nguon_id or not ban_dich_id or not chi_tiet_ids:
-            return jsonify({"success": False, "error": "Thieu du lieu"}), 400
-        hd_nguon = col_hd.find_one({"ban_id": ban_nguon_id, "trang_thai": "chua_thanhtoan"})
-        if not hd_nguon: return jsonify({"success": False, "error": "Ban nguon khong co HD"}), 404
-        hd_dich = col_hd.find_one({"ban_id": ban_dich_id, "trang_thai": "chua_thanhtoan"})
-        if not hd_dich:
-            hid = col_hd.insert_one({"ban_id": ban_dich_id, "trang_thai": "chua_thanhtoan", "ngay_tao": datetime.now(), "ngay_tao_str": datetime.now().strftime("%Y-%m-%d")}).inserted_id
-            hd_dich = {"_id": hid}
-            if oid(ban_dich_id): col_ban.update_one({"_id": oid(ban_dich_id)}, {"$set": {"trang_thai": "co_khach"}})
-        for ct_id in chi_tiet_ids:
-            ct = col_ct.find_one({"_id": oid(ct_id), "hoa_don_id": str(hd_nguon["_id"])})
-            if not ct: continue
-            ex = col_ct.find_one({"hoa_don_id": str(hd_dich["_id"]), "san_pham_id": ct["san_pham_id"]})
-            if ex:
-                col_ct.update_one({"_id": ex["_id"]}, {"$inc": {"so_luong": ct["so_luong"]}})
-                col_ct.delete_one({"_id": ct["_id"]})
-            else:
-                col_ct.update_one({"_id": ct["_id"]}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
-        if col_ct.count_documents({"hoa_don_id": str(hd_nguon["_id"])}) == 0:
-            col_hd.update_one({"_id": hd_nguon["_id"]}, {"$set": {"trang_thai": "da_thanhtoan"}})
-            if oid(ban_nguon_id): col_ban.update_one({"_id": oid(ban_nguon_id)}, {"$set": {"trang_thai": "trong"}})
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
- 
-if __name__=="__main__":
-    port=int(os.environ.get("PORT", 5000))
-    print("="*60)
-    print("QUAN CAFE RACH GIA - DA FIX 502 + TACH GOP BAN")
-    print(f"http://127.0.0.1:{port}")
-    print("="*60)
-    app.run(host="0.0.0.0", port=port, debug=True)
- 
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUÁN CAFE RẠCH GIÁ - POS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .tab.active { background:#374151; color:white; border-bottom:2px solid #10b981; }
+        .tach { background:#3b82f6; color:white; padding:8px 16px; border-radius:8px; font-weight:600; font-size:14px; flex:1; }
+        .tach:hover { background:#2563eb; }
+        .gop { background:#8b5cf6; color:white; padding:8px 16px; border-radius:8px; font-weight:600; font-size:14px; flex:1; }
+        .gop:hover { background:#7c3aed; }
+        .scroll-custom::-webkit-scrollbar { width:6px; height:6px; }
+        .scroll-custom::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:10px; }
+    </style>
+</head>
+<body class="bg-[#f3f4f6] min-h-screen">
+    <!-- HEADER DARK -->
+    <header class="bg-[#1f2937] text-white sticky top-0 z-40 shadow-lg">
+        <div class="flex justify-between items-center px-6 py-3">
+            <h1 class="font-bold text-[18px] tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-mug-hot text-emerald-400"></i>
+                QUÁN CAFE RẠCH GIÁ
+            </h1>
+            <div class="text-[11px] opacity-60 tracking-widest">POS v2.0 • TÁCH / GỘP BÀN</div>
+        </div>
+        <nav class="flex gap-1 px-4 bg-[#111827] border-t border-gray-700 overflow-x-auto">
+            <button data-tab="so-do-ban" onclick="switchTab('so-do-ban')" class="tab active px-4 py-3 text-[13px] font-semibold whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-table-cells"></i> Sơ đồ bàn
+            </button>
+            <button data-tab="ban" onclick="switchTab('ban')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-chair"></i> Bàn
+            </button>
+            <button data-tab="danh-muc" onclick="switchTab('danh-muc')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-layer-group"></i> Danh mục
+            </button>
+            <button data-tab="mon" onclick="switchTab('mon')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-utensils"></i> Món
+            </button>
+            <button data-tab="doanh-thu" onclick="switchTab('doanh-thu')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-chart-line"></i> Doanh thu
+            </button>
+            <button data-tab="cai-dat" onclick="switchTab('cai-dat')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-gear"></i> Cài đặt
+            </button>
+        </nav>
+    </header>
+
+    <main class="p-4 md:p-6 max-w-[1400px] mx-auto">
+        <!-- SƠ ĐỒ BÀN TAB -->
+        <div id="tab-so-do-ban" class="tab-content">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <h2 class="text-[18px] font-bold text-gray-800">Sơ đồ bàn • {{ bans|length }} bàn</h2>
+                    <div class="flex gap-5 text-[13px] font-medium">
+                        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-600"></span> Trống</span>
+                        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500 border border-red-600"></span> Có khách</span>
+                        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-500"></span> Đặt trước</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {% for ban in bans %}
+                <div onclick="openBan({{ ban.id }}, '{{ ban.ten_ban }}')" 
+                     class="ban-item cursor-pointer rounded-xl p-4 border-2 transition-all hover:shadow-lg hover:-translate-y-1
+                     {% if ban.trang_thai == 'trong' %} bg-[#d1fae5] border-emerald-300 text-emerald-900 
+                     {% elif ban.trang_thai == 'co_khach' %} bg-[#fecaca] border-red-400 text-red-900 
+                     {% else %} bg-[#fef3c7] border-yellow-400 text-yellow-900 {% endif %}">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-[18px]">{{ ban.ten_ban }}</span>
+                        {% if ban.trang_thai == 'co_khach' %}
+                        <span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse font-bold">Đang có bill</span>
+                        {% endif %}
+                        {% if ban.trang_thai == 'dat_truoc' %}
+                        <span class="text-[10px] bg-yellow-500 text-white px-2 py-0.5 rounded-full font-bold">Đặt trước</span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3">
+                        {% if ban.trang_thai == 'trong' %}
+                        <div class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 rounded-lg text-[13px] font-semibold text-center">Trống</div>
+                        {% elif ban.trang_thai == 'co_khach' %}
+                        <div class="text-[12px] opacity-80"><i class="fa-solid fa-user-group mr-1"></i> Khách đang ngồi • Nhấn để xem bill</div>
+                        {% else %}
+                        <div class="text-[12px] opacity-80"><i class="fa-solid fa-clock mr-1"></i> {{ ban.gio_dat or 'Đã đặt' }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                <!-- Fallback 12 tables if bans empty for preview -->
+                {% if not bans %}
+                {% for i in range(1,13) %}
+                <div onclick="openBan({{ i }}, 'Bàn {{ i }}')" class="ban-item cursor-pointer rounded-xl p-4 border-2 transition-all hover:shadow-lg hover:-translate-y-1 {{ 'bg-[#d1fae5] border-emerald-300 text-emerald-900' if i%3==1 else 'bg-[#fecaca] border-red-400 text-red-900' if i%3==2 else 'bg-[#fef3c7] border-yellow-400 text-yellow-900' }}">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-[18px]">Bàn {{ i }}</span>
+                        {% if i%3==2 %}<span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse font-bold">Đang có bill</span>{% endif %}
+                    </div>
+                    <div class="mt-3">
+                        {% if i%3==1 %}<div class="w-full bg-emerald-500 text-white py-1.5 rounded-lg text-[13px] font-semibold text-center">Trống</div>
+                        {% else %}<div class="text-[12px] opacity-80">Nhấn để xem bill</div>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- OTHER TABS PLACEHOLDER -->
+        <div id="tab-ban" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Quản lý Bàn - CRUD ở app.py</div>
+        <div id="tab-danh-muc" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Danh mục: {% for dm in danh_mucs %}{{ dm.ten_danh_muc }} {% endfor %}</div>
+        <div id="tab-mon" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Quản lý Món - {{ mons|length }} món</div>
+        <div id="tab-doanh-thu" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Báo cáo doanh thu</div>
+        <div id="tab-cai-dat" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Cài đặt: {{ cai_dat.ten_quan if cai_dat else 'Quán Cafe Rạch Giá' }}</div>
+    </main>
+
+    <!-- MODAL BILL CHÍNH -->
+    <div id="modalBill" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-2 md:p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[1100px] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-gray-50">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-receipt mr-2 text-emerald-600"></i> Bill <span id="modalTenBan" class="text-emerald-700"></span></h3>
+                <button onclick="closeModalBill()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+                <!-- LEFT: ĐÃ GỌI -->
+                <div class="flex-1 p-4 md:p-5 border-r overflow-y-auto scroll-custom bg-white">
+                    <h4 class="font-semibold text-[13px] uppercase tracking-wider text-gray-500 mb-3">Món đã gọi</h4>
+                    <div id="listMonDaGoi" class="space-y-2 mb-4">
+                        <!-- JS sẽ đổ vào đây -->
+                        <div class="text-center py-10 text-gray-400 text-sm">Chưa có món</div>
+                    </div>
+                    <div class="border-t pt-3">
+                        <div class="flex justify-between font-bold text-lg">
+                            <span>Tổng cộng:</span>
+                            <span id="tongTien" class="text-emerald-600">0đ</span>
+                        </div>
+                    </div>
+                    <!-- 2 NÚT MỚI - CHỈ HIỆN KHI CÓ KHÁCH -->
+                    <div id="tachGopActions" style="display:flex;gap:8px;margin:14px 0">
+                        <button onclick="moPopupTachBan()" class="tach"><i class="fa-solid fa-code-branch mr-1"></i> 🔀 Tách bàn</button>
+                        <button onclick="moPopupGopBan()" class="gop"><i class="fa-solid fa-link mr-1"></i> 🔗 Gộp bàn</button>
+                    </div>
+                    <button onclick="thanhToan()" class="w-full mt-2 bg-[#10b981] hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-[15px] shadow-lg">
+                        <i class="fa-solid fa-cash-register mr-2"></i> Thanh toán
+                    </button>
+                </div>
+                <!-- RIGHT: MENU MÓN -->
+                <div class="flex-1 p-4 md:p-5 overflow-y-auto scroll-custom bg-[#f9fafb]">
+                    <h4 class="font-semibold text-[13px] uppercase tracking-wider text-gray-500 mb-3">Thực đơn - Gọi món</h4>
+                    <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+                        <button class="danhmuc-filter active bg-gray-900 text-white px-3 py-1.5 rounded-full text-xs whitespace-nowrap" onclick="filterMon('all')">Tất cả</button>
+                        {% for dm in danh_mucs %}
+                        <button class="danhmuc-filter bg-white border px-3 py-1.5 rounded-full text-xs whitespace-nowrap" onclick="filterMon({{ dm.id }})">{{ dm.ten_danh_muc }}</button>
+                        {% endfor %}
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {% for mon in mons %}
+                        <div data-danhmuc="{{ mon.danh_muc_id }}" class="mon-item bg-white border rounded-xl p-3 flex justify-between items-center hover:shadow-md cursor-pointer" onclick="goiMon({{ mon.id }})">
+                            <div>
+                                <div class="font-semibold text-[14px]">{{ mon.ten_mon }}</div>
+                                <div class="text-emerald-600 font-bold text-[13px]">{{ "{:,.0f}".format(mon.gia) }}đ</div>
+                            </div>
+                            <div class="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center"><i class="fa-solid fa-plus text-xs"></i></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TÁCH BÀN -->
+    <div id="modalTachBan" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-code-branch mr-2 text-blue-600"></i> Tách bàn - <span id="tachTenBan"></span></h3>
+                <button onclick="closeModalTach()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto flex-1 scroll-custom">
+                <p class="text-[13px] text-gray-500 mb-3">Chọn món muốn tách và bàn trống đích đến</p>
+                <div id="tachListMon" class="space-y-2 mb-5 max-h-[260px] overflow-y-auto border rounded-xl p-3 bg-gray-50">
+                    <!-- checkbox món -->
+                </div>
+                <label class="text-[13px] font-semibold text-gray-700">Chọn bàn trống để chuyển đến:</label>
+                <select id="tachBanTrongSelect" class="w-full mt-2 border rounded-xl px-3 py-2.5 text-[14px] bg-white">
+                    <option value="">-- Đang tải bàn trống... --</option>
+                </select>
+            </div>
+            <div class="p-4 border-t flex gap-3">
+                <button onclick="closeModalTach()" class="flex-1 bg-gray-100 py-2.5 rounded-xl font-semibold">Hủy</button>
+                <button onclick="thucHienTachBan()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold">Xác nhận tách</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GỘP BÀN -->
+    <div id="modalGopBan" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-link mr-2 text-violet-600"></i> Gộp bàn - <span id="gopTenBan"></span></h3>
+                <button onclick="closeModalGop()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto flex-1 scroll-custom">
+                <p class="text-[13px] text-gray-500 mb-3">Chọn bàn có khách khác để gộp vào bàn hiện tại (hoặc chuyển bàn hiện tại vào bàn kia)</p>
+                <label class="text-[13px] font-semibold text-gray-700">Chọn bàn có khách để gộp:</label>
+                <div id="gopListBan" class="mt-2 space-y-2 max-h-[320px] overflow-y-auto border rounded-xl p-3 bg-gray-50">
+                    <!-- list bàn có khách -->
+                    <div class="text-center text-gray-400 text-sm py-6">Đang tải bàn có khách...</div>
+                </div>
+                <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-800">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Toàn bộ món của bàn được chọn sẽ được chuyển vào bill hiện tại, bàn kia sẽ trở về Trống.
+                </div>
+            </div>
+            <div class="p-4 border-t flex gap-3">
+                <button onclick="closeModalGop()" class="flex-1 bg-gray-100 py-2.5 rounded-xl font-semibold">Hủy</button>
+                <button onclick="thucHienGopBan()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold">Xác nhận gộp</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentBanId = null;
+        let currentTenBan = '';
+        let selectedGopBanId = null;
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.querySelector('[data-tab="'+tabId+'"]').classList.add('active');
+        }
+
+        async function openBan(banId, tenBan) {
+            currentBanId = banId;
+            currentTenBan = tenBan;
+            document.getElementById('modalTenBan').innerText = tenBan;
+            document.getElementById('modalBill').classList.remove('hidden');
+            await loadMonByBan();
+        }
+
+        function closeModalBill() {
+            document.getElementById('modalBill').classList.add('hidden');
+            currentBanId = null;
+        }
+
+        async function loadMonByBan() {
+            if (!currentBanId) return;
+            try {
+                const res = await fetch('/api/mon-by-ban?ban_id=' + currentBanId);
+                const data = await res.json();
+                const listEl = document.getElementById('listMonDaGoi');
+                const tachListEl = document.getElementById('tachListMon');
+                let tong = 0;
+                if (!data || data.length === 0) {
+                    listEl.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Chưa có món<br><span class="text-xs">Chọn món bên phải để gọi</span></div>';
+                    if (tachListEl) tachListEl.innerHTML = '<div class="text-center text-gray-400 text-sm">Chưa có món để tách</div>';
+                    document.getElementById('tongTien').innerText = '0đ';
+                    return;
+                }
+                let html = '';
+                let tachHtml = '';
+                data.forEach(item => {
+                    const thanhTien = item.so_luong * item.gia;
+                    tong += thanhTien;
+                    html += '<div class="flex justify-between items-center bg-gray-50 border rounded-xl px-3 py-2.5">' +
+                        '<div class="flex-1">' +
+                        '<div class="font-semibold text-[14px]">'+ item.ten_mon +'</div>' +
+                        '<div class="text-[12px] text-gray-500">'+ item.so_luong +' x '+ Number(item.gia).toLocaleString() +'đ</div>' +
+                        '</div>' +
+                        '<div class="flex items-center gap-3">' +
+                        '<span class="font-bold text-[13px]">'+ Number(thanhTien).toLocaleString() +'đ</span>' +
+                        '<button onclick="xoaMon('+ item.id +')" class="w-7 h-7 bg-red-50 text-red-500 rounded-full hover:bg-red-100"><i class="fa-solid fa-trash text-[11px]"></i></button>' +
+                        '</div></div>';
+                    tachHtml += '<label class="flex items-center gap-3 p-2.5 bg-white border rounded-xl cursor-pointer hover:bg-blue-50">' +
+                        '<input type="checkbox" class="tach-checkbox w-4 h-4" value="'+ item.id +'" data-ten="'+ item.ten_mon +'" data-sl="'+ item.so_luong +'">' +
+                        '<span class="flex-1 text-[13px]"><b>'+ item.ten_mon +'</b> x'+ item.so_luong +'</span>' +
+                        '<span class="text-[12px] text-gray-500">'+ Number(thanhTien).toLocaleString() +'đ</span>' +
+                        '</label>';
+                });
+                listEl.innerHTML = html;
+                if (tachListEl) tachListEl.innerHTML = tachHtml;
+                document.getElementById('tongTien').innerText = tong.toLocaleString() + 'đ';
+                // Hiện nút tách/gộp chỉ khi có món
+                document.getElementById('tachGopActions').style.display = data.length > 0 ? 'flex' : 'none';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('listMonDaGoi').innerHTML = '<div class="text-red-500 text-sm">Lỗi tải bill</div>';
+            }
+        }
+
+        async function goiMon(monId) {
+            if (!currentBanId) { alert('Vui lòng chọn bàn trước!'); return; }
+            try {
+                const res = await fetch('/api/goi-mon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ban_id: currentBanId, mon_id: monId, so_luong: 1 })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadMonByBan();
+                } else {
+                    alert(data.message || 'Lỗi gọi món');
+                }
+            } catch (e) { alert('Lỗi kết nối'); }
+        }
+
+        async function xoaMon(id) {
+            if (!confirm('Xóa món này khỏi bill?')) return;
+            try {
+                const res = await fetch('/api/xoa-mon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const data = await res.json();
+                if (data.success) await loadMonByBan();
+            } catch (e) { alert('Lỗi xóa'); }
+        }
+
+        async function thanhToan() {
+            if (!currentBanId) return;
+            if (!confirm('Xác nhận thanh toán bàn ' + currentTenBan + '?')) return;
+            try {
+                const res = await fetch('/api/thanh-toan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ban_id: currentBanId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Thanh toán thành công: ' + (data.tong_tien ? Number(data.tong_tien).toLocaleString() + 'đ' : ''));
+                    closeModalBill();
+                    location.reload();
+                } else {
+                    alert(data.message || 'Lỗi thanh toán');
+                }
+            } catch (e) { alert('Lỗi kết nối thanh toán'); }
+        }
+
+        function filterMon(danhMucId) {
+            document.querySelectorAll('.danhmuc-filter').forEach(b => { b.classList.remove('bg-gray-900','text-white','active'); b.classList.add('bg-white','border'); });
+            event.target.classList.add('bg-gray-900','text-white','active');
+            event.target.classList.remove('bg-white','border');
+            document.querySelectorAll('.mon-item').forEach(el => {
+                if (danhMucId === 'all' || el.dataset.danhmuc == danhMucId) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+        }
+
+        // ===== TÁCH BÀN =====
+        async function moPopupTachBan() {
+            if (!currentBanId) return;
+            document.getElementById('tachTenBan').innerText = currentTenBan;
+            document.getElementById('modalTachBan').classList.remove('hidden');
+            // Load bàn trống
+            try {
+                const res = await fetch('/api/ban-trong');
+                const bansTrong = await res.json();
+                const select = document.getElementById('tachBanTrongSelect');
+                if (bansTrong.length === 0) {
+                    select.innerHTML = '<option value="">Không có bàn trống</option>';
+                } else {
+                    let opt = '<option value="">-- Chọn bàn trống --</option>';
+                    bansTrong.forEach(b => {
+                        if (b.id !== currentBanId) {
+                            opt += '<option value="'+ b.id +'">'+ b.ten_ban +'</option>';
+                        }
+                    });
+                    select.innerHTML = opt;
+                }
+            } catch (e) {
+                document.getElementById('tachBanTrongSelect').innerHTML = '<option>Lỗi tải bàn trống</option>';
+            }
+        }
+        function closeModalTach() {
+            document.getElementById('modalTachBan').classList.add('hidden');
+        }
+
+        async function thucHienTachBan() {
+            const checked = Array.from(document.querySelectorAll('.tach-checkbox:checked')).map(cb => cb.value);
+            const banDich = document.getElementById('tachBanTrongSelect').value;
+            if (checked.length === 0) { alert('Chọn ít nhất 1 món để tách'); return; }
+            if (!banDich) { alert('Chọn bàn trống đích'); return; }
+            if (!confirm('Tách ' + checked.length + ' món sang bàn đã chọn?')) return;
+            try {
+                const res = await fetch('/api/tach-ban', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ban_nguon: currentBanId,
+                        ban_dich: parseInt(banDich),
+                        mon_ids: checked
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Tách bàn thành công!');
+                    closeModalTach();
+                    await loadMonByBan();
+                } else {
+                    alert(data.message || 'Lỗi tách bàn');
+                }
+            } catch (e) { alert('Lỗi kết nối tách bàn'); }
+        }
+
+        // ===== GỘP BÀN =====
+        async function moPopupGopBan() {
+            if (!currentBanId) return;
+            document.getElementById('gopTenBan').innerText = currentTenBan;
+            document.getElementById('modalGopBan').classList.remove('hidden');
+            selectedGopBanId = null;
+            try {
+                const res = await fetch('/api/ban-co-khach');
+                const bansCoKhach = await res.json();
+                const listEl = document.getElementById('gopListBan');
+                const filtered = bansCoKhach.filter(b => b.id !== currentBanId);
+                if (filtered.length === 0) {
+                    listEl.innerHTML = '<div class="text-center text-gray-400 text-sm py-6">Không có bàn có khách khác</div>';
+                } else {
+                    let html = '';
+                    filtered.forEach(b => {
+                        html += '<label class="flex items-center gap-3 p-3 bg-white border rounded-xl cursor-pointer hover:bg-violet-50 has-[:checked]:border-violet-400 has-[:checked]:bg-violet-50">' +
+                            '<input type="radio" name="gop_ban" value="'+ b.id +'" class="gop-radio w-4 h-4" onchange="selectedGopBanId=this.value">' +
+                            '<span class="flex-1 font-semibold text-[14px]">'+ b.ten_ban +'</span>' +
+                            '<span class="text-[11px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Có khách</span>' +
+                            '</label>';
+                    });
+                    listEl.innerHTML = html;
+                }
+            } catch (e) {
+                document.getElementById('gopListBan').innerHTML = '<div class="text-red-500 text-sm text-center py-4">Lỗi tải danh sách bàn</div>';
+            }
+        }
+        function closeModalGop() {
+            document.getElementById('modalGopBan').classList.add('hidden');
+            selectedGopBanId = null;
+        }
+
+        async function thucHienGopBan() {
+            const radio = document.querySelector('input[name="gop_ban"]:checked');
+            if (!radio) { alert('Chọn bàn có khách để gộp'); return; }
+            const banGop = radio.value;
+            if (!confirm('Gộp toàn bộ bill của bàn này vào '+ document.querySelector('input[name="gop_ban"]:checked').parentElement.textContent.trim() +' ?')) return;
+            try {
+                const res = await fetch('/api/gop-ban', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ban_nguon: parseInt(banGop),
+                        ban_dich: currentBanId
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Gộp bàn thành công!');
+                    closeModalGop();
+                    await loadMonByBan();
+                } else {
+                    alert(data.message || 'Lỗi gộp bàn');
+                }
+            } catch (e) { alert('Lỗi kết nối gộp bàn'); }
+        }
+
+        // Đóng modal khi click ngoài
+        document.getElementById('modalBill').addEventListener('click', function(e){ if(e.target===this) closeModalBill(); });
+        document.getElementById('modalTachBan').addEventListener('click', function(e){ if(e.target===this) closeModalTach(); });
+        document.getElementById('modalGopBan').addEventListener('click', function(e){ if(e.target===this) closeModalGop(); });
+    </script>
+</body>
+</html>
