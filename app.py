@@ -53,7 +53,6 @@ def index():
         
         hd = col_hd.find_one({"ban_id": {"$in": query_ids}, "trang_thai": "chua_thanhtoan"})
         
-        # Tự động đồng bộ lại trạng thái bàn khớp với dữ liệu hóa đơn thực tế
         if hd:
             b["hoa_don"] = hd
             if b["trang_thai"] != "co_khach":
@@ -197,7 +196,6 @@ def doanh_thu():
     tong_all = sum([h["tong_tien"] for h in ds])
     return render_template("doanh_thu.html", cai_dat=cd, tong_doanh_thu_loc=tong_all, danh_sach_hd=ds, chi_tiet_all=chi_all, tu_ngay=tu, den_ngay=den, page_title="Doanh thu", use_atlas=True)
 
-# --- API BÁN HÀNG & GỘP BÀN ---
 @app.route("/api/ban-trong")
 def api_ban_trong():
     try:
@@ -323,13 +321,11 @@ def api_gop_ban():
             return jsonify({"success": False, "message": "Bàn nguồn không có hóa đơn"})
             
         if not hd_dich:
-            # Nếu bàn đích chưa có hóa đơn, đổi luôn bàn của hóa đơn nguồn sang bàn đích
             col_hd.update_one({"_id": hd_nguon["_id"]}, {"$set": {"ban_id": ban_dich}})
             if oid(ban_nguon): col_ban.update_one({"_id": oid(ban_nguon)}, {"$set": {"trang_thai": "trong"}})
             if oid(ban_dich): col_ban.update_one({"_id": oid(ban_dich)}, {"$set": {"trang_thai": "co_khach"}})
             return jsonify({"success": True})
             
-        # Nếu cả 2 bàn đều có hóa đơn, gộp chi tiết sang bàn đích và xóa hóa đơn nguồn
         col_ct.update_many({"hoa_don_id": str(hd_nguon["_id"])}, {"$set": {"hoa_don_id": str(hd_dich["_id"])}})
         col_hd.delete_one({"_id": hd_nguon["_id"]})
         if oid(ban_nguon): col_ban.update_one({"_id": oid(ban_nguon)}, {"$set": {"trang_thai": "trong"}})
@@ -340,8 +336,4 @@ def api_gop_ban():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print("="*60)
-    print("QUAN CAFE RACH GIA - MONGODB ATLAS - HOAN CHINH")
-    print(f"http://127.0.0.1:{port}")
-    print("="*60)
     app.run(host="0.0.0.0", port=port, debug=True)
