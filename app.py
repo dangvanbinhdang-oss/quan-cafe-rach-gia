@@ -357,3 +357,100 @@ def api_tach_ban():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+    # ==================== NHÂN VIÊN & PHÂN CA ====================
+@app.route("/admin/nhan-vien")
+def admin_nhan_vien():
+    cd = get_cd()
+    try:
+        nhan_viens = list(col_nv.find().sort("ten_nv", 1))
+        tu_ngay = request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
+        # Mặc định xem 7 ngày từ tu_ngay
+        from datetime import timedelta
+        den_date = datetime.strptime(tu_ngay, "%Y-%m-%d") + timedelta(days=6)
+        den_ngay = den_date.strftime("%Y-%m-%d")
+        if request.args.get("den_ngay"):
+            den_ngay = request.args.get("den_ngay")
+
+        # Lấy phân ca trong khoảng
+        phan_cas = list(col_ca.find({"ngay": {"$gte": tu_ngay, "$lte": den_ngay}}).sort("ngay", 1))
+        # Map để template dễ render: {(ngay, ca): [nv]}
+        lich_map = {}
+        for pc in phan_cas:
+            key = f"{pc['ngay']}_{pc['ca']}"
+            if key not in lich_map: lich_map[key] = []
+            lich_map[key].append(pc)
+
+        # Tạo list ngày
+        ngay_list = []
+        cur = datetime.strptime(tu_ngay, "%Y-%m-%d")
+        end = datetime.strptime(den_ngay, "%Y-%m-%d")
+        while cur <= end:
+            ngay_list.append(cur.strftime("%Y-%m-%d"))
+            cur += timedelta(days=1)
+
+        edit_nv = col_nv.find_one({"_id": oid(request.args.get("edit"))}) if request.args.get("edit") else None
+    except Exception as e:
+        traceback.print_exc()
+        nhan_viens, lich_map, ngay_list, edit_nv = [], {}, [], None
+        tu_ngay = datetime.now().strftime("%Y-%m-%d")
+        den_ngay = tu_ngay
+
+    return render_template("nhan_vien.html",
+        cai_dat=cd, nhan_viens=nhan_viens, lich_map=lich_map,
+        ngay_list=ngay_list, tu_ngay=tu_ngay, den_ngay=den_ngay,
+        edit_nv=edit_nv, page_title="Nhân viên - Phân ca")
+
+@app.route("/admin/nhan-vien/add", methods=["POST"])
+def admin_nv_add():
+    ten = request.form.get("ten_nv","").strip()
+    sdt = request.form.get("sdt","").strip()
+    vai_tro = request.form.get("vai_tro","phuc_vu")
+    luong = float(request.form.get("luong_gio", 0) or 20000)
+    eid = request.form.get("id")
+    data = {"ten_nv": ten, "sdt": sdt, "vai_tro": vai_tro, "luong_gio": luong, "trang_thai": 1}
+    if eid and oid(eid):
+        col_nv.update_one({"_id": oid(eid)}, {"$set": data})
+    else:
+        if ten: col_nv.insert_one(data)
+    return redirect("/admin/nhan-vien")
+
+@app.route("/admin/nhan-vien/delete/<id>")
+def admin_nv_del(id):
+    if oid(id):
+        col_nv.delete_one({"_id": oid(id)})
+        col_ca.delete_many({"nhan_vien_id": id})
+    return redirect("/admin/nhan-vien")
+
+@app.route("/api/phan-ca", methods=["POST"])
+def api_phan_ca():
+    try:
+        d = request.get_json()
+        ngay = d.get("ngay") # YYYY-MM-DD
+        ca = d.get("ca") # sang / chieu / toi
+        nv_ids = d.get("nhan_vien_ids", []) # list id
+        # Xóa ca cũ của ngày đó để ghi đè
+        col_ca.delete_many({"ngay": ngay, "ca": ca})
+        for nv_id in nv_ids:
+            nv = col_nv.find_one({"_id": oid(nv_id)})
+            if nv:
+                col_ca.insert_one({
+                    "ngay": ngay,
+                    "ca": ca,
+                    "nhan_vien_id": str(nv["_id"]),
+                    "ten_nv": nv["ten_nv"],
+                    "vai_tro": nv.get("vai_tro",""),
+                    "sdt": nv.get("sdt","")
+                })
+        return jsonify({"success": True})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/phan-ca/delete", methods=["POST"])
+def api_phan_ca_del():
+    try:
+        d = request.get_json()
+        col_ca.delete_one({"_id": oid(d.get("id"))})
+        return jsonify({"success": True})
+    except:
+        return jsonify({"success": False}), 500
