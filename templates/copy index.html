@@ -10,8 +10,8 @@
 body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; font-family:'Segoe UI',sans-serif}
 .top-header{background:#2b303b; padding:0 20px; height:54px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:1000}
 .top-header .brand{color:#ffc107; font-weight:800; text-transform:uppercase; display:flex; gap:8px; align-items:center}
-.top-header .nav-menu{display:flex; gap:22px; height:100%; align-items:center}
-.top-header .nav-menu a{color:#9aa0a8; text-decoration:none; font-size:.92rem; display:flex; gap:6px; align-items:center; height:100%; border-bottom:2px solid transparent}
+.top-header .nav-menu{display:flex; gap:20px; height:100%; align-items:center; overflow-x:auto}
+.top-header .nav-menu a{color:#9aa0a8; text-decoration:none; font-size:.9rem; display:flex; gap:6px; align-items:center; height:100%; border-bottom:2px solid transparent; white-space:nowrap}
 .top-header .nav-menu a:hover{color:#fff}
 .top-header .nav-menu a.active{color:#fff; border-bottom-color:#ffc107}
 .main-wrapper{flex:1; padding:18px 20px}
@@ -44,6 +44,7 @@ body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; 
 <a href="/admin/danh-muc"><i class="fas fa-list"></i> Danh mục</a>
 <a href="/admin/mon"><i class="fas fa-utensils"></i> Món</a>
 <a href="/doanh-thu"><i class="fas fa-chart-line"></i> Doanh thu</a>
+<a href="/admin/nhan-vien"><i class="fas fa-users"></i> Nhân viên</a>
 <a href="/cai-dat"><i class="fas fa-cog"></i> Cài đặt</a>
 </nav>
 </header>
@@ -109,18 +110,16 @@ body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; 
 <div class="d-flex align-items-center gap-2"><span class="small fw-bold">Hotline hỗ trợ:</span><span class="support-badge"><i class="fas fa-cloud"></i> Atlas - Đồng bộ nhiều máy</span></div>
 </footer>
 
-<!-- MODAL GỘP BÀN -->
 <div class="modal fade" id="modalGopBan" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
 <div class="modal-header"><h6 class="modal-title fw-bold">Gộp bàn</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
 <div class="mb-3"><label class="small fw-bold">Từ bàn (chuyển đi):</label><select id="gop-ban-nguon" class="form-select"></select></div>
 <div class="mb-3"><label class="small fw-bold">Đến bàn (gộp vào):</label><select id="gop-ban-dich" class="form-select"></select></div>
-<div class="alert alert-warning small py-2 mb-0">Bàn 01 và Bàn 02 đều có khách vẫn gộp được. Đã lọc không cho chọn trùng Bàn 03 gộp Bàn 03.</div>
+<div class="alert alert-warning small py-2 mb-0">Đã lọc không cho chọn trùng Bàn 03 gộp Bàn 03.</div>
 </div>
 <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button><button class="btn btn-primary btn-sm" onclick="thucHienGopBan()">Xác nhận gộp</button></div>
 </div></div></div>
 
-<!-- MODAL TÁCH BÀN -->
 <div class="modal fade" id="modalTachBan" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
 <div class="modal-header"><h6 class="modal-title fw-bold">Tách / Chuyển món</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
@@ -131,7 +130,6 @@ body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; 
 <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button><button class="btn btn-info btn-sm text-white fw-bold" onclick="thucHienTachBan()">Xác nhận chuyển</button></div>
 </div></div></div>
 
-<!-- MODAL THANH TOÁN MỚI - TÙY CHỌN IN -->
 <div class="modal fade" id="modalThanhToan" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius:16px">
 <div class="modal-header border-0">
 <h5 class="modal-title fw-bold"><i class="fas fa-receipt me-2 text-success"></i> Thanh toán - <span id="ttTenBan"></span></h5>
@@ -154,7 +152,6 @@ body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; 
 </div>
 </div></div></div>
 
-<!-- KHU VỰC IN ẨN -->
 <div id="printArea" style="display:none">
 <div class="p-4 bill-card">
 <div class="text-center mb-3">
@@ -176,13 +173,11 @@ body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; 
 <script>
 let currentBanId="", currentBanName="", currentOrderData=[], danhSachBanCoKhach=[];
 let modalThanhToan=null;
-
 document.addEventListener("DOMContentLoaded", ()=>{
   loadDanhSachBanSelect();
   document.getElementById('gop-ban-nguon')?.addEventListener('change', capNhatBanDich);
   modalThanhToan = new bootstrap.Modal(document.getElementById('modalThanhToan'));
 });
-
 function chonBan(id,name){
   currentBanId=id; currentBanName=name;
   document.querySelectorAll('.ban-card').forEach(el=>el.classList.remove('border-primary','shadow'));
