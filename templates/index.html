@@ -1,192 +1,474 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-<div>
-<h2 class="fw-bold mb-1"><i class="fa-solid fa-table-cells me-2 text-primary"></i>Sơ đồ bàn</h2>
-<p class="text-muted small mb-0">{{ cai_dat.ten_quan }} - Nhấn vào bàn để gọi món hoặc quản lý</p>
-</div>
-<div class="d-flex gap-2 small align-items-center">
-<span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#00b894"></span> Trống</span>
-<span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#ff7675"></span> Có khách</span>
-<span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#fdcb6e"></span> Đặt trước</span>
-</div>
-</div>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUÁN CAFE RẠCH GIÁ - POS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .tab.active { background:#374151; color:white; border-bottom:2px solid #10b981; }
+        .tach { background:#3b82f6; color:white; padding:8px 16px; border-radius:8px; font-weight:600; font-size:14px; flex:1; }
+        .tach:hover { background:#2563eb; }
+        .gop { background:#8b5cf6; color:white; padding:8px 16px; border-radius:8px; font-weight:600; font-size:14px; flex:1; }
+        .gop:hover { background:#7c3aed; }
+        .scroll-custom::-webkit-scrollbar { width:6px; height:6px; }
+        .scroll-custom::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:10px; }
+    </style>
+</head>
+<body class="bg-[#f3f4f6] min-h-screen">
+    <!-- HEADER DARK -->
+    <header class="bg-[#1f2937] text-white sticky top-0 z-40 shadow-lg">
+        <div class="flex justify-between items-center px-6 py-3">
+            <h1 class="font-bold text-[18px] tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-mug-hot text-emerald-400"></i>
+                QUÁN CAFE RẠCH GIÁ
+            </h1>
+            <div class="text-[11px] opacity-60 tracking-widest">POS v2.0 • TÁCH / GỘP BÀN</div>
+        </div>
+        <nav class="flex gap-1 px-4 bg-[#111827] border-t border-gray-700 overflow-x-auto">
+            <button data-tab="so-do-ban" onclick="switchTab('so-do-ban')" class="tab active px-4 py-3 text-[13px] font-semibold whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-table-cells"></i> Sơ đồ bàn
+            </button>
+            <button data-tab="ban" onclick="switchTab('ban')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-chair"></i> Bàn
+            </button>
+            <button data-tab="danh-muc" onclick="switchTab('danh-muc')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-layer-group"></i> Danh mục
+            </button>
+            <button data-tab="mon" onclick="switchTab('mon')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-utensils"></i> Món
+            </button>
+            <button data-tab="doanh-thu" onclick="switchTab('doanh-thu')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-chart-line"></i> Doanh thu
+            </button>
+            <button data-tab="cai-dat" onclick="switchTab('cai-dat')" class="tab px-4 py-3 text-[13px] font-medium text-gray-400 hover:text-white whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-gear"></i> Cài đặt
+            </button>
+        </nav>
+    </header>
 
-<div class="row g-4">
-{% for ban in bans %}
-<div class="col-6 col-md-4 col-lg-3 col-xl-2">
-<div class="card ban-card ban-{{ ban.trang_thai }} text-center h-100" onclick="openBan('{{ ban._id }}', '{{ ban.ten_ban }}')">
-<div class="fw-bold fs-6 mb-2">{{ ban.ten_ban }}</div>
-{% if ban.trang_thai == 'trong' %}<span class="badge badge-trong rounded-pill px-3 py-2"><i class="fa-solid fa-circle-check me-1"></i>Trống</span>
-{% elif ban.trang_thai == 'co_khach' %}<span class="badge badge-co_khach rounded-pill px-3 py-2"><i class="fa-solid fa-user-group me-1"></i>Có khách</span>
-{% else %}<span class="badge badge-dat_truoc rounded-pill px-3 py-2"><i class="fa-solid fa-clock me-1"></i>Đặt trước</span>{% endif %}
-{% if ban.hoa_don %}<div class="mt-3"><span class="badge bg-white text-danger border fw-bold animate-pulse"><i class="fa-solid fa-receipt me-1"></i>Đang có bill</span></div>{% endif %}
-<div class="mt-2 small opacity-75"><i class="fa-solid fa-hand-pointer me-1"></i>Chạm để thao tác</div>
-</div>
-</div>
-{% endfor %}
-</div>
+    <main class="p-4 md:p-6 max-w-[1400px] mx-auto">
+        <!-- SƠ ĐỒ BÀN TAB -->
+        <div id="tab-so-do-ban" class="tab-content">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <h2 class="text-[18px] font-bold text-gray-800">Sơ đồ bàn • {{ bans|length }} bàn</h2>
+                    <div class="flex gap-5 text-[13px] font-medium">
+                        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-600"></span> Trống</span>
+                        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500 border border-red-600"></span> Có khách</span>
+                        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-500"></span> Đặt trước</span>
+                    </div>
+                </div>
+            </div>
 
-{% if not bans %}
-<div class="text-center py-5"><i class="fa-solid fa-chair fa-3x text-muted mb-3"></i><p class="text-muted">Chưa có bàn nào. Vào Quản lý bàn để thêm nhé!</p><a href="/admin/ban" class="btn btn-primary">Thêm bàn ngay</a></div>
-{% endif %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {% for ban in bans %}
+                <div onclick="openBan({{ ban.id }}, '{{ ban.ten_ban }}')" 
+                     class="ban-item cursor-pointer rounded-xl p-4 border-2 transition-all hover:shadow-lg hover:-translate-y-1
+                     {% if ban.trang_thai == 'trong' %} bg-[#d1fae5] border-emerald-300 text-emerald-900 
+                     {% elif ban.trang_thai == 'co_khach' %} bg-[#fecaca] border-red-400 text-red-900 
+                     {% else %} bg-[#fef3c7] border-yellow-400 text-yellow-900 {% endif %}">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-[18px]">{{ ban.ten_ban }}</span>
+                        {% if ban.trang_thai == 'co_khach' %}
+                        <span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse font-bold">Đang có bill</span>
+                        {% endif %}
+                        {% if ban.trang_thai == 'dat_truoc' %}
+                        <span class="text-[10px] bg-yellow-500 text-white px-2 py-0.5 rounded-full font-bold">Đặt trước</span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3">
+                        {% if ban.trang_thai == 'trong' %}
+                        <div class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 rounded-lg text-[13px] font-semibold text-center">Trống</div>
+                        {% elif ban.trang_thai == 'co_khach' %}
+                        <div class="text-[12px] opacity-80"><i class="fa-solid fa-user-group mr-1"></i> Khách đang ngồi • Nhấn để xem bill</div>
+                        {% else %}
+                        <div class="text-[12px] opacity-80"><i class="fa-solid fa-clock mr-1"></i> {{ ban.gio_dat or 'Đã đặt' }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                <!-- Fallback 12 tables if bans empty for preview -->
+                {% if not bans %}
+                {% for i in range(1,13) %}
+                <div onclick="openBan({{ i }}, 'Bàn {{ i }}')" class="ban-item cursor-pointer rounded-xl p-4 border-2 transition-all hover:shadow-lg hover:-translate-y-1 {{ 'bg-[#d1fae5] border-emerald-300 text-emerald-900' if i%3==1 else 'bg-[#fecaca] border-red-400 text-red-900' if i%3==2 else 'bg-[#fef3c7] border-yellow-400 text-yellow-900' }}">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-[18px]">Bàn {{ i }}</span>
+                        {% if i%3==2 %}<span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse font-bold">Đang có bill</span>{% endif %}
+                    </div>
+                    <div class="mt-3">
+                        {% if i%3==1 %}<div class="w-full bg-emerald-500 text-white py-1.5 rounded-lg text-[13px] font-semibold text-center">Trống</div>
+                        {% else %}<div class="text-[12px] opacity-80">Nhấn để xem bill</div>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
 
-<!-- Modal Gọi Món & Quản lý bàn -->
-<div class="modal fade" id="modalBan" tabindex="-1">
-<div class="modal-dialog modal-xl modal-dialog-scrollable">
-<div class="modal-content border-0" style="border-radius:20px">
-<div class="modal-header border-0 pb-0">
-<div><h5 class="modal-title fw-bold fs-4" id="modalBanTitle"></h5><p class="text-muted small mb-0">Gọi món, tách bàn hoặc gộp bàn</p></div>
-<button class="btn-close" data-bs-dismiss="modal"></button>
-</div>
-<div class="modal-body pt-3">
-<div class="row g-4">
-<div class="col-lg-5">
-<div class="d-flex justify-content-between align-items-center mb-3"><h6 class="fw-bold mb-0"><i class="fa-solid fa-book-open me-2 text-primary"></i>Thực đơn</h6><span class="badge bg-primary-subtle text-primary">{{ mons|length }} món</span></div>
-<select id="filterDM" class="form-select mb-3" style="border-radius:12px" onchange="filterMon()"><option value="">🍽️ Tất cả danh mục</option>{% for dm in danh_mucs %}<option value="{{ dm._id }}">{{ dm.ten_danh_muc }}</option>{% endfor %}</select>
-<div id="listMon" style="max-height:480px; overflow-y:auto" class="pe-1">
-{% for mon in mons %}
-<div class="card mb-2 mon-item border-0 shadow-sm" data-dm="{{ mon.danh_muc_id }}" style="border-radius:12px">
-<div class="card-body p-3 d-flex justify-content-between align-items-center">
-<div><div class="fw-bold">{{ mon.ten_mon }}</div><div class="small text-danger fw-bold mt-1">{{ "{:,.0f}".format(mon.gia) }}đ</div></div>
-<button class="btn btn-primary btn-sm rounded-circle" style="width:36px;height:36px" onclick="goiMon('{{ mon._id }}')"><i class="fa-solid fa-plus"></i></button>
-</div>
-</div>
-{% endfor %}
-</div>
-</div>
-<div class="col-lg-7">
-<div class="card border-0 bg-light" style="border-radius:16px">
-<div class="card-body p-4">
-<div class="d-flex justify-content-between align-items-center mb-3">
-<h6 class="fw-bold mb-0"><i class="fa-solid fa-receipt me-2 text-success"></i>Món đã gọi</h6>
-<div class="d-flex gap-2">
-<button class="btn btn-outline-warning btn-sm fw-bold" onclick="moModalGopBan()"><i class="fa-solid fa-object-group me-1"></i>Gộp bàn</button>
-<button class="btn btn-outline-info btn-sm fw-bold" onclick="moModalTachBan()"><i class="fa-solid fa-object-ungroup me-1"></i>Tách bàn</button>
-</div>
-</div>
-<div class="table-responsive">
-<table class="table table-sm align-middle mb-0"><thead><tr class="small text-muted"><th>Món</th><th class="text-center">SL</th><th class="text-end">Giá</th><th></th></tr></thead><tbody id="tblChiTiet"></tbody></table>
-</div>
-<div id="emptyBill" class="text-center py-4 text-muted small"><i class="fa-solid fa-basket-shopping fa-2x mb-2 d-block"></i>Chưa có món nào</div>
-<hr>
-<div class="d-flex justify-content-between align-items-center"><span class="fw-bold">Tổng cộng:</span><span id="tongTien" class="fw-bold fs-4 text-danger">0đ</span></div>
-<button class="btn btn-success w-100 mt-3 py-3 fw-bold fs-6" style="border-radius:12px" onclick="thanhToan()"><i class="fa-solid fa-cash-register me-2"></i>Thanh toán & In bill</button>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
+        <!-- OTHER TABS PLACEHOLDER -->
+        <div id="tab-ban" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Quản lý Bàn - CRUD ở app.py</div>
+        <div id="tab-danh-muc" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Danh mục: {% for dm in danh_mucs %}{{ dm.ten_danh_muc }} {% endfor %}</div>
+        <div id="tab-mon" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Quản lý Món - {{ mons|length }} món</div>
+        <div id="tab-doanh-thu" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Báo cáo doanh thu</div>
+        <div id="tab-cai-dat" class="tab-content hidden bg-white rounded-xl p-10 text-center text-gray-400">Cài đặt: {{ cai_dat.ten_quan if cai_dat else 'Quán Cafe Rạch Giá' }}</div>
+    </main>
 
-<!-- Modal Gộp Bàn -->
-<div class="modal fade" id="modalGopBan" tabindex="-1">
-<div class="modal-dialog">
-<div class="modal-content border-0" style="border-radius:16px">
-<div class="modal-header border-0">
-<h5 class="modal-title fw-bold"><i class="fa-solid fa-object-group me-2 text-warning"></i>Gộp bàn</h5>
-<button class="btn-close" data-bs-dismiss="modal"></button>
-</div>
-<div class="modal-body">
-<p class="text-muted small">Chọn bàn muốn gộp <strong>vào bàn hiện tại</strong>:</p>
-<select id="selectBanGop" class="form-select mb-3" style="border-radius:12px">
-{% for ban in bans %}<option value="{{ ban._id }}">{{ ban.ten_ban }}</option>{% endfor %}
-</select>
-<button class="btn btn-warning w-100 fw-bold py-2 text-dark" style="border-radius:12px" onclick="thucHienGopBan()">Xác nhận gộp bàn</button>
-</div>
-</div>
-</div>
-</div>
+    <!-- MODAL BILL CHÍNH -->
+    <div id="modalBill" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-2 md:p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[1100px] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-gray-50">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-receipt mr-2 text-emerald-600"></i> Bill <span id="modalTenBan" class="text-emerald-700"></span></h3>
+                <button onclick="closeModalBill()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+                <!-- LEFT: ĐÃ GỌI -->
+                <div class="flex-1 p-4 md:p-5 border-r overflow-y-auto scroll-custom bg-white">
+                    <h4 class="font-semibold text-[13px] uppercase tracking-wider text-gray-500 mb-3">Món đã gọi</h4>
+                    <div id="listMonDaGoi" class="space-y-2 mb-4">
+                        <!-- JS sẽ đổ vào đây -->
+                        <div class="text-center py-10 text-gray-400 text-sm">Chưa có món</div>
+                    </div>
+                    <div class="border-t pt-3">
+                        <div class="flex justify-between font-bold text-lg">
+                            <span>Tổng cộng:</span>
+                            <span id="tongTien" class="text-emerald-600">0đ</span>
+                        </div>
+                    </div>
+                    <!-- 2 NÚT MỚI - CHỈ HIỆN KHI CÓ KHÁCH -->
+                    <div id="tachGopActions" style="display:flex;gap:8px;margin:14px 0">
+                        <button onclick="moPopupTachBan()" class="tach"><i class="fa-solid fa-code-branch mr-1"></i> 🔀 Tách bàn</button>
+                        <button onclick="moPopupGopBan()" class="gop"><i class="fa-solid fa-link mr-1"></i> 🔗 Gộp bàn</button>
+                    </div>
+                    <button onclick="thanhToan()" class="w-full mt-2 bg-[#10b981] hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-[15px] shadow-lg">
+                        <i class="fa-solid fa-cash-register mr-2"></i> Thanh toán
+                    </button>
+                </div>
+                <!-- RIGHT: MENU MÓN -->
+                <div class="flex-1 p-4 md:p-5 overflow-y-auto scroll-custom bg-[#f9fafb]">
+                    <h4 class="font-semibold text-[13px] uppercase tracking-wider text-gray-500 mb-3">Thực đơn - Gọi món</h4>
+                    <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+                        <button class="danhmuc-filter active bg-gray-900 text-white px-3 py-1.5 rounded-full text-xs whitespace-nowrap" onclick="filterMon('all')">Tất cả</button>
+                        {% for dm in danh_mucs %}
+                        <button class="danhmuc-filter bg-white border px-3 py-1.5 rounded-full text-xs whitespace-nowrap" onclick="filterMon({{ dm.id }})">{{ dm.ten_danh_muc }}</button>
+                        {% endfor %}
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {% for mon in mons %}
+                        <div data-danhmuc="{{ mon.danh_muc_id }}" class="mon-item bg-white border rounded-xl p-3 flex justify-between items-center hover:shadow-md cursor-pointer" onclick="goiMon({{ mon.id }})">
+                            <div>
+                                <div class="font-semibold text-[14px]">{{ mon.ten_mon }}</div>
+                                <div class="text-emerald-600 font-bold text-[13px]">{{ "{:,.0f}".format(mon.gia) }}đ</div>
+                            </div>
+                            <div class="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center"><i class="fa-solid fa-plus text-xs"></i></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<!-- Modal Tách Bàn -->
-<div class="modal fade" id="modalTachBan" tabindex="-1">
-<div class="modal-dialog">
-<div class="modal-content border-0" style="border-radius:16px">
-<div class="modal-header border-0">
-<h5 class="modal-title fw-bold"><i class="fa-solid fa-object-ungroup me-2 text-info"></i>Tách bàn</h5>
-<button class="btn-close" data-bs-dismiss="modal"></button>
-</div>
-<div class="modal-body">
-<p class="text-muted small">Chọn bàn đích (bàn trống) để chuyển các món đã chọn sang:</p>
-<select id="selectBanTach" class="form-select mb-3" style="border-radius:12px">
-{% for ban in bans %}<option value="{{ ban._id }}">{{ ban.ten_ban }}</option>{% endfor %}
-</select>
-<button class="btn btn-info w-100 fw-bold py-2 text-white" style="border-radius:12px" onclick="thucHienTachBan()">Xác nhận tách bàn</button>
-</div>
-</div>
-</div>
-</div>
-{% endblock %}
-{% block scripts %}
-<script>
-let currentBanId=null;
-function openBan(id,ten){currentBanId=id; document.getElementById('modalBanTitle').innerHTML='<i class="fa-solid fa-chair me-2"></i>'+ten; loadChiTiet(); new bootstrap.Modal(document.getElementById('modalBan')).show();}
-function filterMon(){let dm=document.getElementById('filterDM').value; document.querySelectorAll('.mon-item').forEach(el=>{el.style.display=(!dm||el.dataset.dm==dm)?'block':'none';});}
-async function loadChiTiet(){let res=await fetch('/api/mon-by-ban?ban_id='+currentBanId); let data=await res.json(); let html=''; let tong=0; let has=false;
- if(data.data && data.data.length>0){has=true; data.data.forEach(it=>{let tt=it.so_luong*it.don_gia; tong+=tt; html+=`<tr><td><div class="fw-semibold">${it.ten_mon}</div></td><td class="text-center"><span class="badge bg-dark rounded-pill">${it.so_luong}</span></td><td class="text-end fw-bold">${it.don_gia.toLocaleString('vi-VN')}đ</td><td class="text-end"><button class="btn btn-sm btn-outline-danger rounded-circle" style="width:28px;height:28px" onclick="xoaMon('${it.id}')"><i class="fa-solid fa-xmark"></i></button></td></tr>`;});}
- document.getElementById('tblChiTiet').innerHTML=html;
- document.getElementById('tongTien').innerText=tong.toLocaleString('vi-VN')+'đ';
- document.getElementById('emptyBill').style.display=has?'none':'block';
-}
-async function goiMon(monId){await fetch('/api/goi-mon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ban_id:currentBanId,mon_id:monId,so_luong:1})}); loadChiTiet();}
-async function xoaMon(id){await fetch('/api/xoa-mon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}); loadChiTiet();}
-async function thanhToan(){if(!confirm('Xác nhận thanh toán bàn này?')) return; await fetch('/api/thanh-toan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ban_id:currentBanId})}); alert('✅ Đã thanh toán thành công!'); location.reload();}
+    <!-- MODAL TÁCH BÀN -->
+    <div id="modalTachBan" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-code-branch mr-2 text-blue-600"></i> Tách bàn - <span id="tachTenBan"></span></h3>
+                <button onclick="closeModalTach()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto flex-1 scroll-custom">
+                <p class="text-[13px] text-gray-500 mb-3">Chọn món muốn tách và bàn trống đích đến</p>
+                <div id="tachListMon" class="space-y-2 mb-5 max-h-[260px] overflow-y-auto border rounded-xl p-3 bg-gray-50">
+                    <!-- checkbox món -->
+                </div>
+                <label class="text-[13px] font-semibold text-gray-700">Chọn bàn trống để chuyển đến:</label>
+                <select id="tachBanTrongSelect" class="w-full mt-2 border rounded-xl px-3 py-2.5 text-[14px] bg-white">
+                    <option value="">-- Đang tải bàn trống... --</option>
+                </select>
+            </div>
+            <div class="p-4 border-t flex gap-3">
+                <button onclick="closeModalTach()" class="flex-1 bg-gray-100 py-2.5 rounded-xl font-semibold">Hủy</button>
+                <button onclick="thucHienTachBan()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold">Xác nhận tách</button>
+            </div>
+        </div>
+    </div>
 
-// Các hàm tính năng Gộp bàn & Tách bàn
-function moModalGopBan(){
-    let modal = new bootstrap.Modal(document.getElementById('modalGopBan'));
-    modal.show();
-}
+    <!-- MODAL GỘP BÀN -->
+    <div id="modalGopBan" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-link mr-2 text-violet-600"></i> Gộp bàn - <span id="gopTenBan"></span></h3>
+                <button onclick="closeModalGop()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto flex-1 scroll-custom">
+                <p class="text-[13px] text-gray-500 mb-3">Chọn bàn có khách khác để gộp vào bàn hiện tại (hoặc chuyển bàn hiện tại vào bàn kia)</p>
+                <label class="text-[13px] font-semibold text-gray-700">Chọn bàn có khách để gộp:</label>
+                <div id="gopListBan" class="mt-2 space-y-2 max-h-[320px] overflow-y-auto border rounded-xl p-3 bg-gray-50">
+                    <!-- list bàn có khách -->
+                    <div class="text-center text-gray-400 text-sm py-6">Đang tải bàn có khách...</div>
+                </div>
+                <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-800">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Toàn bộ món của bàn được chọn sẽ được chuyển vào bill hiện tại, bàn kia sẽ trở về Trống.
+                </div>
+            </div>
+            <div class="p-4 border-t flex gap-3">
+                <button onclick="closeModalGop()" class="flex-1 bg-gray-100 py-2.5 rounded-xl font-semibold">Hủy</button>
+                <button onclick="thucHienGopBan()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold">Xác nhận gộp</button>
+            </div>
+        </div>
+    </div>
 
-async function thucHienGopBan(){
-    let banNguonId = document.getElementById('selectBanGop').value;
-    if(banNguonId === currentBanId){
-        alert('⚠️ Không thể gộp cùng một bàn!');
-        return;
-    }
-    if(!confirm('Bạn có chắc chắn muốn gộp bàn này không?')) return;
-    
-    let res = await fetch('/api/gop-ban', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ban_cu_id: banNguonId, ban_moi_id: currentBanId})
-    });
-    let result = await res.json();
-    if(result.success || res.ok){
-        alert('✅ Gộp bàn thành công!');
-        location.reload();
-    } else {
-        alert('❌ Lỗi gộp bàn: ' + (result.message || 'Thất bại'));
-    }
-}
+    <script>
+        let currentBanId = null;
+        let currentTenBan = '';
+        let selectedGopBanId = null;
 
-function moModalTachBan(){
-    let modal = new bootstrap.Modal(document.getElementById('modalTachBan'));
-    modal.show();
-}
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.querySelector('[data-tab="'+tabId+'"]').classList.add('active');
+        }
 
-async function thucHienTachBan(){
-    let banDichId = document.getElementById('selectBanTach').value;
-    if(banDichId === currentBanId){
-        alert('⚠️ Không thể tách sang chính bàn hiện tại!');
-        return;
-    }
-    if(!confirm('Bạn có chắc chắn muốn chuyển dữ liệu sang bàn đích không?')) return;
+        async function openBan(banId, tenBan) {
+            currentBanId = banId;
+            currentTenBan = tenBan;
+            document.getElementById('modalTenBan').innerText = tenBan;
+            document.getElementById('modalBill').classList.remove('hidden');
+            await loadMonByBan();
+        }
 
-    let res = await fetch('/api/tach-ban', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ban_goc_id: currentBanId, ban_dich_id: banDichId})
-    });
-    let result = await res.json();
-    if(result.success || res.ok){
-        alert('✅ Tách bàn thành công!');
-        location.reload();
-    } else {
-        alert('❌ Lỗi tách bàn: ' + (result.message || 'Thất bại'));
-    }
-}
-</script>
-{% endblock %}
+        function closeModalBill() {
+            document.getElementById('modalBill').classList.add('hidden');
+            currentBanId = null;
+        }
+
+        async function loadMonByBan() {
+            if (!currentBanId) return;
+            try {
+                const res = await fetch('/api/mon-by-ban?ban_id=' + currentBanId);
+                const data = await res.json();
+                const listEl = document.getElementById('listMonDaGoi');
+                const tachListEl = document.getElementById('tachListMon');
+                let tong = 0;
+                if (!data || data.length === 0) {
+                    listEl.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Chưa có món<br><span class="text-xs">Chọn món bên phải để gọi</span></div>';
+                    if (tachListEl) tachListEl.innerHTML = '<div class="text-center text-gray-400 text-sm">Chưa có món để tách</div>';
+                    document.getElementById('tongTien').innerText = '0đ';
+                    return;
+                }
+                let html = '';
+                let tachHtml = '';
+                data.forEach(item => {
+                    const thanhTien = item.so_luong * item.gia;
+                    tong += thanhTien;
+                    html += '<div class="flex justify-between items-center bg-gray-50 border rounded-xl px-3 py-2.5">' +
+                        '<div class="flex-1">' +
+                        '<div class="font-semibold text-[14px]">'+ item.ten_mon +'</div>' +
+                        '<div class="text-[12px] text-gray-500">'+ item.so_luong +' x '+ Number(item.gia).toLocaleString() +'đ</div>' +
+                        '</div>' +
+                        '<div class="flex items-center gap-3">' +
+                        '<span class="font-bold text-[13px]">'+ Number(thanhTien).toLocaleString() +'đ</span>' +
+                        '<button onclick="xoaMon('+ item.id +')" class="w-7 h-7 bg-red-50 text-red-500 rounded-full hover:bg-red-100"><i class="fa-solid fa-trash text-[11px]"></i></button>' +
+                        '</div></div>';
+                    tachHtml += '<label class="flex items-center gap-3 p-2.5 bg-white border rounded-xl cursor-pointer hover:bg-blue-50">' +
+                        '<input type="checkbox" class="tach-checkbox w-4 h-4" value="'+ item.id +'" data-ten="'+ item.ten_mon +'" data-sl="'+ item.so_luong +'">' +
+                        '<span class="flex-1 text-[13px]"><b>'+ item.ten_mon +'</b> x'+ item.so_luong +'</span>' +
+                        '<span class="text-[12px] text-gray-500">'+ Number(thanhTien).toLocaleString() +'đ</span>' +
+                        '</label>';
+                });
+                listEl.innerHTML = html;
+                if (tachListEl) tachListEl.innerHTML = tachHtml;
+                document.getElementById('tongTien').innerText = tong.toLocaleString() + 'đ';
+                // Hiện nút tách/gộp chỉ khi có món
+                document.getElementById('tachGopActions').style.display = data.length > 0 ? 'flex' : 'none';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('listMonDaGoi').innerHTML = '<div class="text-red-500 text-sm">Lỗi tải bill</div>';
+            }
+        }
+
+        async function goiMon(monId) {
+            if (!currentBanId) { alert('Vui lòng chọn bàn trước!'); return; }
+            try {
+                const res = await fetch('/api/goi-mon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ban_id: currentBanId, mon_id: monId, so_luong: 1 })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadMonByBan();
+                } else {
+                    alert(data.message || 'Lỗi gọi món');
+                }
+            } catch (e) { alert('Lỗi kết nối'); }
+        }
+
+        async function xoaMon(id) {
+            if (!confirm('Xóa món này khỏi bill?')) return;
+            try {
+                const res = await fetch('/api/xoa-mon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const data = await res.json();
+                if (data.success) await loadMonByBan();
+            } catch (e) { alert('Lỗi xóa'); }
+        }
+
+        async function thanhToan() {
+            if (!currentBanId) return;
+            if (!confirm('Xác nhận thanh toán bàn ' + currentTenBan + '?')) return;
+            try {
+                const res = await fetch('/api/thanh-toan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ban_id: currentBanId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Thanh toán thành công: ' + (data.tong_tien ? Number(data.tong_tien).toLocaleString() + 'đ' : ''));
+                    closeModalBill();
+                    location.reload();
+                } else {
+                    alert(data.message || 'Lỗi thanh toán');
+                }
+            } catch (e) { alert('Lỗi kết nối thanh toán'); }
+        }
+
+        function filterMon(danhMucId) {
+            document.querySelectorAll('.danhmuc-filter').forEach(b => { b.classList.remove('bg-gray-900','text-white','active'); b.classList.add('bg-white','border'); });
+            event.target.classList.add('bg-gray-900','text-white','active');
+            event.target.classList.remove('bg-white','border');
+            document.querySelectorAll('.mon-item').forEach(el => {
+                if (danhMucId === 'all' || el.dataset.danhmuc == danhMucId) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+        }
+
+        // ===== TÁCH BÀN =====
+        async function moPopupTachBan() {
+            if (!currentBanId) return;
+            document.getElementById('tachTenBan').innerText = currentTenBan;
+            document.getElementById('modalTachBan').classList.remove('hidden');
+            // Load bàn trống
+            try {
+                const res = await fetch('/api/ban-trong');
+                const bansTrong = await res.json();
+                const select = document.getElementById('tachBanTrongSelect');
+                if (bansTrong.length === 0) {
+                    select.innerHTML = '<option value="">Không có bàn trống</option>';
+                } else {
+                    let opt = '<option value="">-- Chọn bàn trống --</option>';
+                    bansTrong.forEach(b => {
+                        if (b.id !== currentBanId) {
+                            opt += '<option value="'+ b.id +'">'+ b.ten_ban +'</option>';
+                        }
+                    });
+                    select.innerHTML = opt;
+                }
+            } catch (e) {
+                document.getElementById('tachBanTrongSelect').innerHTML = '<option>Lỗi tải bàn trống</option>';
+            }
+        }
+        function closeModalTach() {
+            document.getElementById('modalTachBan').classList.add('hidden');
+        }
+
+        async function thucHienTachBan() {
+            const checked = Array.from(document.querySelectorAll('.tach-checkbox:checked')).map(cb => cb.value);
+            const banDich = document.getElementById('tachBanTrongSelect').value;
+            if (checked.length === 0) { alert('Chọn ít nhất 1 món để tách'); return; }
+            if (!banDich) { alert('Chọn bàn trống đích'); return; }
+            if (!confirm('Tách ' + checked.length + ' món sang bàn đã chọn?')) return;
+            try {
+                const res = await fetch('/api/tach-ban', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ban_nguon: currentBanId,
+                        ban_dich: parseInt(banDich),
+                        mon_ids: checked
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Tách bàn thành công!');
+                    closeModalTach();
+                    await loadMonByBan();
+                } else {
+                    alert(data.message || 'Lỗi tách bàn');
+                }
+            } catch (e) { alert('Lỗi kết nối tách bàn'); }
+        }
+
+        // ===== GỘP BÀN =====
+        async function moPopupGopBan() {
+            if (!currentBanId) return;
+            document.getElementById('gopTenBan').innerText = currentTenBan;
+            document.getElementById('modalGopBan').classList.remove('hidden');
+            selectedGopBanId = null;
+            try {
+                const res = await fetch('/api/ban-co-khach');
+                const bansCoKhach = await res.json();
+                const listEl = document.getElementById('gopListBan');
+                const filtered = bansCoKhach.filter(b => b.id !== currentBanId);
+                if (filtered.length === 0) {
+                    listEl.innerHTML = '<div class="text-center text-gray-400 text-sm py-6">Không có bàn có khách khác</div>';
+                } else {
+                    let html = '';
+                    filtered.forEach(b => {
+                        html += '<label class="flex items-center gap-3 p-3 bg-white border rounded-xl cursor-pointer hover:bg-violet-50 has-[:checked]:border-violet-400 has-[:checked]:bg-violet-50">' +
+                            '<input type="radio" name="gop_ban" value="'+ b.id +'" class="gop-radio w-4 h-4" onchange="selectedGopBanId=this.value">' +
+                            '<span class="flex-1 font-semibold text-[14px]">'+ b.ten_ban +'</span>' +
+                            '<span class="text-[11px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Có khách</span>' +
+                            '</label>';
+                    });
+                    listEl.innerHTML = html;
+                }
+            } catch (e) {
+                document.getElementById('gopListBan').innerHTML = '<div class="text-red-500 text-sm text-center py-4">Lỗi tải danh sách bàn</div>';
+            }
+        }
+        function closeModalGop() {
+            document.getElementById('modalGopBan').classList.add('hidden');
+            selectedGopBanId = null;
+        }
+
+        async function thucHienGopBan() {
+            const radio = document.querySelector('input[name="gop_ban"]:checked');
+            if (!radio) { alert('Chọn bàn có khách để gộp'); return; }
+            const banGop = radio.value;
+            if (!confirm('Gộp toàn bộ bill của bàn này vào '+ document.querySelector('input[name="gop_ban"]:checked').parentElement.textContent.trim() +' ?')) return;
+            try {
+                const res = await fetch('/api/gop-ban', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ban_nguon: parseInt(banGop),
+                        ban_dich: currentBanId
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Gộp bàn thành công!');
+                    closeModalGop();
+                    await loadMonByBan();
+                } else {
+                    alert(data.message || 'Lỗi gộp bàn');
+                }
+            } catch (e) { alert('Lỗi kết nối gộp bàn'); }
+        }
+
+        // Đóng modal khi click ngoài
+        document.getElementById('modalBill').addEventListener('click', function(e){ if(e.target===this) closeModalBill(); });
+        document.getElementById('modalTachBan').addEventListener('click', function(e){ if(e.target===this) closeModalTach(); });
+        document.getElementById('modalGopBan').addEventListener('click', function(e){ if(e.target===this) closeModalGop(); });
+    </script>
+</body>
+</html>
