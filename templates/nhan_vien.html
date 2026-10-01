@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} - {{ cai_dat.ten_quan }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body{background:#eef0f2; display:flex; flex-direction:column; min-height:100vh; font-family:'Segoe UI',sans-serif}
+.top-header{background:#2b303b; padding:0 20px; height:54px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:1000}
+.top-header.brand{color:#ffc107; font-weight:800; text-transform:uppercase; display:flex; gap:8px; align-items:center}
+.top-header.nav-menu{display:flex; gap:22px; height:100%; align-items:center}
+.top-header.nav-menu a{color:#9aa0a8; text-decoration:none; font-size:.92rem; display:flex; gap:6px; align-items:center; height:100%; border-bottom:2px solid transparent}
+.top-header.nav-menu a.active{color:#fff; border-bottom-color:#ffc107}
+.main-wrapper{flex:1; padding:18px 20px}
+.bottom-footer{background:#2b303b; color:#fff; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; margin-top:20px}
+.bottom-footer.brand{color:#ffc107; font-weight:800; text-transform:uppercase}
+.support-badge{background:#1abc9c; color:#fff; border-radius:20px; padding:5px 14px; font-size:.82rem; font-weight:600}
+.shift-sang{background:#d1e7dd; border-left:4px solid #198754}
+.shift-chieu{background:#fff3cd; border-left:4px solid #ffc107}
+.shift-toi{background:#cfe2ff; border-left:4px solid #0d6efd}
+.nv-badge{font-size:.75rem; padding:4px 8px; border-radius:20px}
+</style>
+</head>
+<body>
+<header class="top-header">
+<div class="brand"><i class="fas fa-mug-hot"></i> {{ cai_dat.ten_quan }}</div>
+<nav class="nav-menu">
+<a href="/"><i class="fas fa-th-large"></i> Sơ đồ bàn</a>
+<a href="/admin/ban"><i class="fas fa-chair"></i> Bàn</a>
+<a href="/admin/danh-muc"><i class="fas fa-list"></i> Danh mục</a>
+<a href="/admin/mon"><i class="fas fa-utensils"></i> Món</a>
+<a href="/doanh-thu"><i class="fas fa-chart-line"></i> Doanh thu</a>
+<a href="/admin/nhan-vien" class="active"><i class="fas fa-users"></i> Nhân viên</a>
+<a href="/cai-dat"><i class="fas fa-cog"></i> Cài đặt</a>
+</nav>
+</header>
+
+<div class="main-wrapper">
+<div class="container-fluid">
+<div class="row g-3">
+<!-- CỘT TRÁI: DANH SÁCH NV -->
+<div class="col-lg-4">
+<div class="card shadow-sm mb-3" style="border-radius:12px">
+<div class="card-header bg-white fw-bold"><i class="fas fa-user-plus me-2 text-primary"></i> {{ 'Sửa nhân viên' if edit_nv else 'Thêm nhân viên' }}</div>
+<div class="card-body">
+<form method="POST" action="/admin/nhan-vien/add">
+<input type="hidden" name="id" value="{{ edit_nv._id if edit_nv else '' }}">
+<div class="mb-2"><label class="small fw-bold">Tên nhân viên</label><input name="ten_nv" value="{{ edit_nv.ten_nv if edit_nv else '' }}" class="form-control form-control-sm" required placeholder="VD: Lan"></div>
+<div class="row g-2 mb-2">
+<div class="col-6"><label class="small fw-bold">SĐT</label><input name="sdt" value="{{ edit_nv.sdt if edit_nv else '' }}" class="form-control form-control-sm" placeholder="0909..."></div>
+<div class="col-6"><label class="small fw-bold">Vai trò</label>
+<select name="vai_tro" class="form-select form-select-sm">
+<option value="phuc_vu" {{ 'selected' if edit_nv and edit_nv.vai_tro=='phuc_vu' else '' }}>Phục vụ</option>
+<option value="pha_che" {{ 'selected' if edit_nv and edit_nv.vai_tro=='pha_che' else '' }}>Pha chế</option>
+<option value="thu_ngan" {{ 'selected' if edit_nv and edit_nv.vai_tro=='thu_ngan' else '' }}>Thu ngân</option>
+<option value="bao_ve" {{ 'selected' if edit_nv and edit_nv.vai_tro=='bao_ve' else '' }}>Bảo vệ</option>
+</select></div>
+</div>
+<div class="mb-3"><label class="small fw-bold">Lương / giờ</label><input name="luong_gio" type="number" value="{{ edit_nv.luong_gio if edit_nv else '20000' }}" class="form-control form-control-sm"></div>
+<button class="btn btn-primary btn-sm w-100 fw-bold"><i class="fas fa-save me-1"></i> {{ 'Cập nhật' if edit_nv else 'Thêm nhân viên' }}</button>
+{% if edit_nv %}<a href="/admin/nhan-vien" class="btn btn-light btn-sm w-100 mt-2">Hủy sửa</a>{% endif %}
+</form>
+</div>
+</div>
+
+<div class="card shadow-sm" style="border-radius:12px">
+<div class="card-header bg-white fw-bold"><i class="fas fa-list me-2"></i> Danh sách ({{ nhan_viens|length }})</div>
+<div class="list-group list-group-flush" style="max-height:400px; overflow-y:auto">
+{% for nv in nhan_viens %}
+<div class="list-group-item d-flex justify-content-between align-items-center">
+<div><div class="fw-bold small">{{ nv.ten_nv }} <span class="badge bg-light text-dark border ms-1" style="font-size:.65rem">{{ nv.vai_tro }}</span></div><div class="text-muted" style="font-size:.7rem">{{ nv.sdt }} - {{ "{:,.0f}".format(nv.luong_gio) }}đ/h</div></div>
+<div class="d-flex gap-1">
+<a href="/admin/nhan-vien?edit={{ nv._id }}" class="btn btn-sm btn-outline-primary py-0 px-1"><i class="fas fa-pen" style="font-size:.7rem"></i></a>
+<a href="/admin/nhan-vien/delete/{{ nv._id }}" onclick="return confirm('Xóa?')" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="fas fa-trash" style="font-size:.7rem"></i></a>
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+</div>
+
+<!-- CỘT PHẢI: LỊCH TRỰC -->
+<div class="col-lg-8">
+<div class="card shadow-sm mb-3" style="border-radius:12px">
+<div class="card-body">
+<form method="GET" class="row g-2 align-items-end">
+<div class="col-auto"><label class="small fw-bold">Từ ngày</label><input type="date" name="tu_ngay" value="{{ tu_ngay }}" class="form-control form-control-sm"></div>
+<div class="col-auto"><label class="small fw-bold">Đến ngày</label><input type="date" name="den_ngay" value="{{ den_ngay }}" class="form-control form-control-sm"></div>
+<div class="col-auto"><button class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Xem lịch</button></div>
+<div class="col-auto"><span class="badge shift-sang">Sáng 6-12h</span> <span class="badge shift-chieu">Chiều 12-18h</span> <span class="badge shift-toi">Tối 18-23h</span></div>
+</form>
+</div>
+</div>
+
+<div class="card shadow-sm" style="border-radius:12px">
+<div class="table-responsive">
+<table class="table table-bordered mb-0 align-middle" style="font-size:.85rem">
+<thead class="table-dark text-center"><tr><th style="width:90px">Ca / Ngày</th>
+{% for ngay in ngay_list %}<th class="small">{{ ngay[8:10] }}/{{ ngay[5:7] }}<br><span style="font-size:.65rem">{{ ngay }}</span></th>{% endfor %}
+</tr></thead>
+<tbody>
+{% for ca_code, ca_ten in [('sang','Sáng 6-12h'), ('chieu','Chiều 12-18h'), ('toi','Tối 18-23h')] %}
+<tr>
+<td class="fw-bold text-center {{ 'shift-sang' if ca_code=='sang' else 'shift-chieu' if ca_code=='chieu' else 'shift-toi' }}">{{ ca_ten }}</td>
+{% for ngay in ngay_list %}
+<td class="p-1" style="min-width:110px; vertical-align:top">
+{% set key = ngay + '_' + ca_code %}
+{% for pc in lich_map.get(key, []) %}
+<div class="badge bg-white text-dark border d-flex justify-content-between align-items-center mb-1 nv-badge w-100">
+<span><i class="fas fa-user me-1"></i>{{ pc.ten_nv }}</span>
+<button onclick="xoaPhanCa('{{ pc._id }}')" class="btn p-0 ms-1 text-danger" style="font-size:.6rem"><i class="fas fa-times"></i></button>
+</div>
+{% endfor %}
+<button class="btn btn-sm btn-outline-primary w-100 mt-1 py-0" style="font-size:.7rem" onclick="openPhanCa('{{ ngay }}','{{ ca_code }}')"><i class="fas fa-plus"></i> Phân ca</button>
+</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- MODAL PHÂN CA -->
+<div class="modal fade" id="modalPhanCa" tabindex="-1"><div class="modal-dialog"><div class="modal-content" style="border-radius:12px">
+<div class="modal-header"><h6 class="modal-title fw-bold">Phân ca: <span id="pcNgay"></span> - <span id="pcCa"></span></h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div id="pcListNv" class="d-flex flex-column gap-2" style="max-height:300px; overflow-y:auto"></div>
+</div>
+<div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button><button class="btn btn-primary btn-sm fw-bold" onclick="luuPhanCa()">Lưu phân ca</button></div>
+</div></div></div>
+
+<footer class="bottom-footer">
+<div class="brand"><i class="fas fa-mug-hot me-2"></i> {{ cai_dat.ten_quan }}</div>
+<div class="d-flex align-items-center gap-2"><span class="small fw-bold">Quản lý ca trực</span><span class="support-badge"><i class="fas fa-users"></i> {{ nhan_viens|length }} nhân viên</span></div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let currentPhanCaNgay='', currentPhanCaCa='';
+let nhanViens = {{ nhan_viens|tojson }};
+function openPhanCa(ngay, ca){
+  currentPhanCaNgay=ngay; currentPhanCaCa=ca;
+  document.getElementById('pcNgay').innerText=ngay;
+  document.getElementById('pcCa').innerText= ca=='sang'?'Sáng 6-12h':ca=='chieu'?'Chiều 12-18h':'Tối 18-23h';
+  let html='';
+  nhanViens.forEach(nv=>{
+    html+=`<label class="border rounded p-2 d-flex align-items-center gap-2" style="cursor:pointer">
+      <input type="checkbox" value="${nv._id}" class="pc-check form-check-input m-0">
+      <span class="fw-bold small">${nv.ten_nv}</span>
+      <span class="badge bg-light text-dark border ms-auto" style="font-size:.65rem">${nv.vai_tro}</span>
+    </label>`;
+  });
+  document.getElementById('pcListNv').innerHTML=html || '<p class="text-muted small text-center">Chưa có nhân viên, thêm bên trái</p>';
+  new bootstrap.Modal(document.getElementById('modalPhanCa')).show();
+}
+function luuPhanCa(){
+  let ids = Array.from(document.querySelectorAll('.pc-check:checked')).map(c=>c.value);
+  fetch('/api/phan-ca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ngay:currentPhanCaNgay, ca:currentPhanCaCa, nhan_vien_ids:ids})})
+ .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error); });
+}
+function xoaPhanCa(id){
+  if(!confirm('Xóa phân ca này?')) return;
+  fetch('/api/phan-ca/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(()=>location.reload());
+}
+</script>
+</body>
+</html>
