@@ -157,30 +157,110 @@ def cai_dat_page():
 @app.route("/doanh-thu")
 def doanh_thu():
     cd = get_cd()
-    tu = request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
-    den = request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
-    ds = []
-    for hd in col_hd.find({"trang_thai": "da_thanhtoan"}).sort("ngay_tao", -1):
-        ngay = hd.get("ngay_tao_str","")
-        if tu <= ngay <= den:
+    try:
+        tu = request.args.get("tu_ngay", datetime.now().strftime("%Y-%m-%d"))
+        den = request.args.get("den_ngay", datetime.now().strftime("%Y-%m-%d"))
+        
+        ds = []
+        # Lấy hết rồi lọc trong Python cho an toàn, tránh lỗi sort trên Atlas
+        all_hd = list(col_hd.find({"trang_thai": "da_thanhtoan"}))
+        
+        for hd in all_hd:
+            ngay_str = hd.get("ngay_tao_str", "")
+            # Nếu hóa đơn cũ không có ngày, tự lấy từ ngay_tao
+            if not ngay_str and hd.get("ngay_tao"):
+                try:
+                    ngay_str = hd["ngay_tao"].strftime("%Y-%m-%d")
+                except:
+                    ngay_str = ""
+            
+            if not ngay_str:
+                continue
+                
+            # Lọc theo khoảng ngày (so sánh chuỗi YYYY-MM-DD)
+            if not (tu <= ngay_str <= den):
+                continue
+
+            # Tính tổng tiền
             tong = 0
-            for c in col_ct.find({"hoa_don_id": str(hd["_id"])}):
-                tong += c["so_luong"] * c["don_gia"]
-            hd_fix = {"_id": str(hd["_id"]),"ban_id": hd.get("ban_id",""),"trang_thai": hd.get("trang_thai",""),"ngay_tao_str": ngay,"tong_tien": tong}
-            ban = col_ban.find_one({"_id": oid(hd["ban_id"])}) if oid(hd["ban_id"]) else None
-            hd_fix["ten_ban"] = ban["ten_ban"] if ban else hd["ban_id"]
+            cts_raw = list(col_ct.find({"hoa_don_id": str(hd["_id"])}))
+            for c in cts_raw:
+                try:
+                    tong += int(c.get("so_luong", 0)) * float(c.get("don_gia", 0))
+                except:
+                    pass
+            
+            hd_fix = {
+                "_id": str(hd["_id"]),
+                "ban_id": str(hd.get("ban_id","")),
+                "trang_thai": hd.get("trang_thai",""),
+                "ngay_tao_str": ngay_str,
+                "ngay_tao": hd.get("ngay_tao"),
+                "tong_tien": tong
+            }
+            
+            # Lấy tên bàn
+            ten_ban = hd.get("ban_id","")
+            try:
+                if oid(hd.get("ban_id")):
+                    b = col_ban.find_one({"_id": oid(hd["ban_id"])})
+                    if b: ten_ban = b.get("ten_ban", ten_ban)
+            except:
+                pass
+            hd_fix["ten_ban"] = ten_ban
             ds.append(hd_fix)
-    chi_all = {}
-    for hd in ds:
-        cts = list(col_ct.find({"hoa_don_id": hd["_id"]}))
-        ct_fix_list = []
-        for ct in cts:
-            mon = col_mon.find_one({"_id": oid(ct["san_pham_id"])}) if oid(ct["san_pham_id"]) else None
-            ct_fix = {"_id": str(ct["_id"]),"so_luong": ct.get("so_luong", 0),"don_gia": ct.get("don_gia", 0),"ten_mon": mon["ten_mon"] if mon else "Món"}
-            ct_fix_list.append(ct_fix)
-        chi_all[hd["_id"]] = ct_fix_list
-    tong_all = sum([h["tong_tien"] for h in ds])
-    return render_template("doanh_thu.html", cai_dat=cd, tong_doanh_thu_loc=tong_all, danh_sach_hd=ds, chi_tiet_all=chi_all, tu_ngay=tu, den_ngay=den, page_title="Doanh thu", use_atlas=True)
+        
+        # Sort mới nhất trước
+        ds.sort(key=lambda x: x.get("ngay_tao_str",""), reverse=True)
+
+        # Lấy chi tiết cho từng hóa đơn
+        chi_all = {}
+        for hd in ds:
+            cts = list(col_ct.find({"hoa_don_id": hd["_id"]}))
+            ct_fix_list = []
+            for ct in cts:
+                ten_mon = "Món"
+                try:
+                    if oid(ct.get("san_pham_id")):
+                        mon = col_mon.find_one({"_id": oid(ct["san_pham_id"])})
+                        if mon: ten_mon = mon.get("ten_mon", ten_mon)
+                except:
+                    pass
+                ct_fix_list.append({
+                    "_id": str(ct["_id"]),
+                    "so_luong": ct.get("so_luong", 0),
+                    "don_gia": ct.get("don_gia", 0),
+                    "ten_mon": ten_mon
+                })
+            chi_all[hd["_id"]] = ct_fix_list
+        
+        tong_all = sum([h["tong_tien"] for h in ds])
+        
+        return render_template("doanh_thu.html", 
+            cai_dat=cd, 
+            tong_doanh_thu_loc=tong_all, 
+            danh_sach_hd=ds, 
+            chi_tiet_all=chi_all, 
+            tu_ngay=tu, 
+            den_ngay=den, 
+            page_title="Doanh thu", 
+            use_atlas=True)
+            
+    except Exception as e:
+        print(f"LOI DOANH THU: {e}")
+        import traceback
+        traceback.print_exc()
+        # Trả về trang rỗng chứ không crash 500 nữa
+        return render_template("doanh_thu.html", 
+            cai_dat=cd, 
+            tong_doanh_thu_loc=0, 
+            danh_sach_hd=[], 
+            chi_tiet_all={}, 
+            tu_ngay=datetime.now().strftime("%Y-%m-%d"), 
+            den_ngay=datetime.now().strftime("%Y-%m-%d"), 
+            page_title="Doanh thu", 
+            use_atlas=True,
+            error_msg=str(e))
 
 # ================= API FIX =================
 
